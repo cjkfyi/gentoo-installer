@@ -1,0 +1,460 @@
+#
+# Partitioning Disks
+#
+
+cfdisk /dev/nvme0n1
+gpt
+1g efi
+??g swap (if you choose to use a swap)
+????g linux file system
+write
+quit
+
+#
+# Formatting Disks
+#
+
+mkfs.vfat -F 32 /dev/nvme0n1p1
+mkswap /dev/nvme0n1p2 (if you made a swap)
+mkfs.btrfs /dev/nvme0n1p3
+
+#
+# Base Filesystem
+#
+
+mkdir --parents /mnt/gentoo
+mount /dev/nvme0n1p3 /mnt/gentoo
+
+mkdir -p /mnt/gentoo/boot/efi
+mount /dev/nvme0n1p1 /mnt/gentoo/boot/efi
+
+swapon /dev/nvme0n1p2
+
+btrfs subvolume create /mnt/gentoo/@
+btrfs subvolume create /mnt/gentoo/@home
+btrfs subvolume create /mnt/gentoo/@snapshots
+
+btrfs subvolume list /mnt/gentoo
+(output should look something like this)
+ID 256 gen 7 top level 5 path @
+ID 257 gen 8 top level 5 path @home
+ID 258 gen 9 top level 5 path @snapshots
+
+unmount /mnt/gentoo
+
+mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@ /dev/nvme0n1p3 /mnt/gentoo
+
+cd /mnt/gentoo
+
+wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz
+tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner
+
+nano /mnt/gentoo/etc/portage/make.conf
+
+delete everything inside make.conf and copy and paste this
+-----------------------------------------------------------
+
+change MAKEOPTS to whatever your cpu can handle. -j=cores -l=threads
+whatever you set -j and -l to, also set that under EMERGE_DEFAULT_OPTS as well
+
+# These settings were set by the catalyst build script that automatically
+# built this stage.
+# Please consult /usr/share/portage/config/make.conf.example for a more
+# detailed example.
+COMMON_FLAGS="-march=alderlake -mabm -mno-cldemote -mno-kl -mno-sgx -mno-widekl -mshstk --param=l1-cache-line-size=64 --param=l1-cache-size=48 --param=l2-cache-size=36864 -O2 -pipe"
+CFLAGS="${COMMON_FLAGS}"
+CXXFLAGS="${COMMON_FLAGS}"
+FCFLAGS="${COMMON_FLAGS}"
+FFLAGS="${COMMON_FLAGS}"
+
+MAKEOPTS="-j12 -l12"
+PORTAGE_NICENESS="1"
+EMERGE_DEFAULT_OPTS="--ask --tree --verbose --jobs=12 --load-average=12 --with-bdeps y --complete-graph y"
+FEATURES="candy fixlafiles unmerge-orphans parallel-fetch parallel-install"
+
+CPU_FLAGS_X86="aes avx avx2 f16c fma3 mmx mmxext pclmul popcnt rdrand sha sse sse2 sse3 sse4_1 sse4_2 ssse3 vpclmulqdq"
+
+ACCEPT_LICENSE="*"
+ACCEPT_KEYWORDS="~amd64"
+GRUB_PLATFORMS="efi-64"
+VIDEO_CARDS="nvidia"
+INPUT_DEVICES="libinput"
+
+PORTAGE_TMPDIR="/var/tmp/portage"
+PORTAGE_SCHEDULING_POLICY="idle"
+
+# NOTE: This stage was built with the bindist Use flag enabled
+PORTDIR="/var/db/repos/gentoo"
+DISTDIR="/var/cache/binpkgs"
+PKGDIR="/var/cache/binpkgs"
+
+# This sets the language of build output to English.
+# Please keep this setting intact when reporting bugs.
+LC_MESSAGES=C
+LANG="en_US.UTF-8"
+L10N="en en-US"
+
+#Gentoo Mirrors
+GENTOO_MIRRORS="https://mirrors.mit.edu/gentoo-distfiles/"
+
+save and exit
+
+nano /mnt/gentoo/etc/portage/package.use/\*
+
+copy and paste this (change your use flags to whatever you want this is what I use)
+
+#################################### GL0BAL ####################################
+#
+# Enabled
+#
+*/* minimal dist-kernel elogind dbus udev udisks python_targets_python3_12
+*/* bash-completion jpeg jpegxl heif gif png opengl nvenc vaapi vulkan
+*/* pulseaudio wayland X
+#
+# Disabled
+#
+*/* -python_targets_python2_7 -systemd -ipv6 -nouveau -kde -gnome -consolekit
+*/* -cups -crypt
+#################################### L0CAL #####################################
+
+save and quit
+
+copy over DNS info
+------------------
+cp --dereference /etc/resolv.conf /mnt/gentoo/etc/
+
+mount these mount points
+------------------------
+mount --types proc /proc /mnt/gentoo/proc
+mount --rbind /sys /mnt/gentoo/sys
+mount --make-rslave /mnt/gentoo/sys
+mount --rbind /dev /mnt/gentoo/dev
+mount --make-rslave /mnt/gentoo/dev
+mount --bind /run /mnt/gentoo/run
+mount --make-slave /mnt/gentoo/run
+
+test and make portage tmp for install
+-------------------------------------
+test -L /dev/shm && rm /dev/shm && mkdir /dev/shm
+mount --types tmpfs --options nosuid,nodev,noexec shm /dev/shm
+chmod 1777 /dev/shm /run/shm
+
+(if you get an error saying /run/shm doesnt exist, mkdir /run/shm and then do chmod cmd again)
+
+chroot
+------
+chroot /mnt/gentoo /bin/bash
+source /etc/profile
+export PS1="(chroot) ${PS1}"
+
+mkdir /.snapshots
+
+mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@snapshots /dev/nvme0n1p3 /.snapshots
+
+mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@home /dev/nvme0n1p3 /home
+
+# https://wiki.gentoo.org/wiki/Portage_with_Git
+
+emerge-webrsync
+emerge --sync
+
+emerge cpuid2cpuflags resolve-march-native
+
+cpuid2cpuflags
+copy your cpu flags and then nano /etc/portage/make.conf, delete my cpu flags and replace them with yours
+save and quit
+
+resolve-march-native
+copy your march and then nano /etc/portage/make.conf, delete my march and replace with yours
+save and quit
+
+emerge --ask --verbose --update --deep --newuse @world
+emerge --depclean
+
+#
+# Timezone & Time
+#
+
+echo "YourCountry/YourCity" > /etc/timezone
+emerge sys-libs/timezone-data
+
+emerge net-misc/ntp
+rc-update add ntpd default
+rc-service ntpd start
+
+#
+# Locale
+#
+
+nano /etc/locale.gen
+uncomment your locale
+
+(example below)
+#en_US ISO-8859-1
+en_US.UTF-8 UTF-8
+#de_DE ISO-8859-1
+#de_DE.UTF-8 UTF-8
+
+save and quit
+
+locale-gen
+
+eselect locale list
+(output should look something like this)
+Available targets for the LANG variable:
+  [1]  C
+  [2]  C.utf8
+  [3]  en_US
+  [4]  en_US.iso88591
+  [5]  en_US.utf8
+  [6]  de_DE
+  [7]  de_DE.iso88591
+  [8]  de_DE.utf8
+  [9] POSIX
+whatever you uncommented above you are going to set
+
+eselect locale set 5
+
+env-update && source /etc/profile && export PS1="(chroot) ${PS1}"
+
+#
+# Kernel
+#
+
+since i added dist-kernel to my global use flags, a distro kernel,dracut,and grub are already pre installed for the most part. there are some things we have to do though and unfortunately the first one is going to recompile the kernel again.
+
+linux-firmware is needed for AMD,NVIDIA, and Intel, unfortunately this package also includes everything else.
+
+first, nano /etc/portage/package.use/installkernel
+sys-kernel/installkernel dracut grub
+save and quit
+
+doing that saves us time later on
+
+emerge --ask sys-kernel/linux-firmware
+
+
+after that is done we are going to install SOF Firmware which is an open source audio driver. THIS IS OPTIONAL, if you would like to see if your chipset can you use it, here is full documention.
+https://thesofproject.github.io/latest/platforms/index.html
+
+next we install microcode. the linux-firmware package we installed above includes microcode for AMD but not Intel.
+emerge --ask sys-firmware/intel-microcode
+
+emerge --depclean
+
+we do not need to build an initramfs because that was also done by installing linux-firmware
+
+#
+# FSTAB
+#
+
+Gentoo itself has a genfstab package which can be emerged, its a fork of archinstall scripts, I have never used it but if you want to try it out it can be installed via emerge sys-fs/genfstab
+
+https://github.com/glacion/genfstab
+click genfstab
+download raw
+open file location
+open terminal here
+sudo su
+chmod +x genfstab
+./genfstab /mnt/gentoo
+you should see all your mountpoints and subvolumes that you created, now we send over to gentoo install
+./genfstab /mnt/gentoo > /mnt/gentoo/etc/fstab
+close out of terminal window and file manager
+
+#
+# Hostname & Networking
+#
+
+echo meowzers > /etc/hostname
+
+nano /etc/hostname
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   meowzers.localdomain  meowzers
+
+save and quit
+
+nano /etc/conf.d/hostname
+meowzers
+save and quit
+
+emerge net-misc/dhcpcd
+rc-update add dhcpcd default
+rc-service dhcpcd start
+
+emerge networkmanager
+rc-update add NetworkManager default
+rc-service NetworkManager start
+
+just so we dont forget
+rc-update add elogind default
+rc-service elogind start
+
+#
+# System Info
+#
+
+setting root password
+passwd
+enter your password
+enter it again
+
+if you need to change your keyboard shit and keymaps
+nano /etc/conf.d/keymaps
+
+if you want to change your hwclock options, i set mine to local
+nano /etc/conf.d/hwclock
+
+#
+# Installing Tools
+#
+
+emerge btrfs-progs nvme-cli (optional i use this one biosdevname) sys-apps/mlocate app-shells/bash-completion sys-block/io-scheduler-udev-rules (last one is for nvme drives)
+
+emerge app-admin/sysklogd
+rc-update add sysklogd default
+rc-service sysklogd default
+
+rc-update add sshd default
+
+#
+# Bootloader / Grub
+#
+
+grub and dracut are already preinstalled as i mentioned above. if you want to use os-prober if you plan on dual booting you need to do this
+
+emerge os-prober
+
+emerge-grub
+
+this will give you updated grub for os-prober
+
+grub-install --efi-directory=/boot/efi
+grub-mkconfig -o /boot/grub/grub.cfg
+
+do not add or uncomment os-prober line while on live cd it will throw an error, do that after first reboot
+
+#
+# Doas / Adding Users
+#
+
+emerge doas
+
+touch /etc/doas.conf
+chown -c root:root /etc/doas.conf
+chmod -c 0400 /etc/doas.conf
+
+nano /etc/doas.conf
+permit nopass :wheel
+save and quit
+or
+permit persist: wheel
+save and quit
+
+useradd -m -G users,wheel,audio,cdrom,portage,usb,video -s /bin/bash cat
+
+passwd cat
+enter password
+enter it again
+
+exit
+
+rm stage tab complete to delete the tarball
+
+cd ../..
+
+umount -l /mnt/gentoo/dev{/shm,/pts,}
+umount -R /mnt/gentoo
+reboot
+
+
+#
+# First Login
+#
+
+login
+nmtui
+connect to wifi if you're wireless
+date, if your date and time are out of sync
+doas ntpd -qg
+then wait a few minutes and run date command again for it to sync
+
+emerge eselect-repository dev-vcs/git
+
+emerge x11-drivers/nvidia-drivers wayland xwayland qtwayland wayland-protocols gtk gtk+ qt5ct qt6ct kitty
+
+reboot pc
+
+login again
+
+doas nvidia-smi
+
+make sure nvidia driver is installed
+
+doas eselect repository enable guru
+emaint sync -r guru
+doas emerge hyprland xdg-desktop-portal-hyprland
+
+reboot pc again
+
+login
+
+Hyprland
+
+superkey + q to open kitty
+
+nano ~/.config/hypr/hyprland.conf
+
+change ur keybinds and shit for rn we will add environment variables and other shit later
+
+#
+# Pipewire
+#
+
+doas nano /etc/portage/package.use/\*
+
+under local type or add this
+
+media-video/pipewire                sound-server X dbus echo-cancel gsettings gstreamer pipewire-alsa
+media-video/wireplumber             elogind
+
+save and quit
+
+doas emerge --unmerge media-sound/pulseaudio-daemon
+doas emerge media-libs/libpulse
+
+doas emerge --ask --verbose --changed-use --update --deep @world
+doas emerge --depclean
+doas emerge media-video/pipewire
+doas emerge media-video/wireplumber
+emerge --ask sys-auth/rtkit
+
+logout/exit hyprland
+login to root account
+
+usermod -aG pipewire youruser
+usermod -rG audio youruser
+
+exit root
+
+log back into youruser and launch hyprland
+
+mkdir ~/.config/pipewire/
+cp -R /usr/share/pipewire/pipewire.conf ~/.config/pipewire/pipewire.conf
+
+nano ~/.config/hypr/hyprland.conf
+
+add this line to start up
+
+gentoo-pipewire-launcher &
+
+save and quit
+
+reboot pc
+
+login
+
+pactl info
+
+u now have pipewire working
