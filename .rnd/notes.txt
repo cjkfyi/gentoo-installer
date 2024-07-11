@@ -33,6 +33,8 @@ swapon /dev/nvme0n1p2
 btrfs subvolume create /mnt/gentoo/@
 btrfs subvolume create /mnt/gentoo/@home
 btrfs subvolume create /mnt/gentoo/@snapshots
+btrfs subvolume create /mnt/gentoo/@devel
+btrfs subvolume create /mnt/gentoo/@virt
 
 btrfs subvolume list /mnt/gentoo
 (output should look something like this)
@@ -150,8 +152,9 @@ export PS1="(chroot) ${PS1}"
 mkdir /.snapshots
 
 mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@snapshots /dev/nvme0n1p3 /.snapshots
-
 mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@home /dev/nvme0n1p3 /home
+mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@devel /dev/nvme0n1p3 /devel
+mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@virt /dev/nvme0n1p3 /virt
 
 # https://wiki.gentoo.org/wiki/Portage_with_Git
 
