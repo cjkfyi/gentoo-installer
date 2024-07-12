@@ -6,10 +6,9 @@
 
 clear
 
-# Check if gum is installed, else add it.
-if ! pacman -Qs gum > /dev/null 2>&1; then
+if ! pacman -Qs gum > /dev/null; then
     printf "\n📦 Installing the pkg gum...\n"
-    pacman -Sy --noconfirm gum > /dev/null 2>&1
+    pacman -Sy --noconfirm gum > /dev/null
     printf "\n✅ Successfully installed gum!\n"
 fi
 
@@ -40,34 +39,10 @@ function sel_block() {
 }
 
 if ! sel_block; then
-    exit 1 
+    exit 1
 fi
 
 #
-
-function fde_start() {
-    printf "\nFDE PROCESS IS STARTING\n"
-    return 0
-}
-
-function fde_opt() {
-
-    if gum confirm "Want to perform a Full Disk Encryption setup?"; then
-        printf "👻 FDE isn't implemented yet, carry on...\n"
-        part_block
-    else
-        printf "👻 FDE isn't implemented yet, carry on...\n"
-        part_block
-    fi
-
-    return 0
-}
-
-if ! fde_opt; then
-    exit 1 
-fi
-
-# 
 
 function part_block() {
 
@@ -75,31 +50,34 @@ function part_block() {
         --value 120 \
         --prompt "👉 Input the size in MB for your BOOT partition: " | head -n 1)
 
+    BOOT_SECTORS=$(($BOOT_SIZE * 1048576 / 512))
+
     SWAP_SIZE=$(gum input --width 120 \
         --value 32000 \
         --prompt "👉 Input the size in MB for your SWAP partition: " | head -n 1)
 
-    sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${BLK}
-      o # clear the in memory partition table
+    SWAP_SECTORS=$(($SWAP_SIZE * 1048576 / 512))
+
+    BOTH_SECTORS=$(($BOOT_SECTORS + $SWAP_SECTORS + 4098))
+
+    sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${BLK} > /dev/null
+      g # new GPT
       n # new partition
-      p # primary partition
-      1 # partition number 1
-        # default - start at beginning of disk 
+      1 # default partition 1
+        # default - start at beginning of disk
       +${BOOT_SIZE}M # MB BOOT parttion
       n # new partition
-      p # primary partition
-      2 # partion number 2
+      2 # default partion 2
         # default, start immediately after preceding partition
       +${SWAP_SIZE}M # MB SWAP parttion
-      t # set the type
-      L # Linux swap
+      t # set type
+      2 # of part 2
+      19 # swap type
       n # new partition
-      p # primary partition
       3 # partion number 3
-      +$(($BOOT_SIZE + $SWAP_SIZE + 4096))M # MB ROOT parttion
+      $BOTH_SECTORS
         # default, extend partition to end of disk
       w # write the partition table
-      q # and we're done
 EOF
 
     printf "✅ BOOT, SWAP & ROOT partitions were created!\n\n"
