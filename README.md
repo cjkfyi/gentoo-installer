@@ -1,3 +1,3 @@
 # `gentoo-installer`
 
->  Automate your Gentoo linux installations. 
+>  Bash script to automate a Gentoo linux installation. 
