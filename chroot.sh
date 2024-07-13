@@ -106,3 +106,21 @@ EOF
 if ! use_flags; then
     exit 1
 fi
+
+#
+
+function websync() {
+
+    clear
+
+    emerge-webrsync
+    emerge --sync --quiet
+
+    printf "✅ emerge-webrsync was ran!\n\n"
+}
+
+if ! websync; then
+    exit 1
+fi
+
+

@@ -176,4 +176,3 @@ function prep_base() {
 if ! prep_base; then
     exit 1
 fi
-
