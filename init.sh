@@ -166,6 +166,10 @@ function prep_base() {
     mount --bind /run ${MNT}/run
     mount --make-slave ${MNT}/run
 
+    mkdir ${MNT}/.snapshots
+    mkdir ${MNT}/devel
+    mkdir ${MNT}/virt
+
     chroot ${MNT} /bin/bash -c "./chroot.sh"
 }
 

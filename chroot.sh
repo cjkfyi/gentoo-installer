@@ -1,9 +1,24 @@
 #!/bin/bash
 
-echo "ECHO FROM CHROOT"
+printf "✅ Dropped into chroot!\n\n"
 
 #
 # Formatting
+#
+
+function mnt_subs() {
+    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@snapshots /dev/nvme0n1p3 /.snapshots
+    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@home /dev/nvme0n1p3 /home
+    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@devel /dev/nvme0n1p3 /devel
+    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@virt /dev/nvme0n1p3 /virt
+    
+    printf "✅ Mounted sub volumes!\n\n"
+}
+
+if ! mnt_subs; then
+    exit 1
+fi
+
 #
 
 function make_conf() {
@@ -13,18 +28,15 @@ function make_conf() {
     MAKEOPTS="-j12 -l12"
     PORTAGE_NICENESS="1"
 
-    # Set variables for Gentoo settings
     GENTOO_MIRRORS="https://mirrors.mit.edu/gentoo-distfiles/"
     PORTDIR="/var/db/repos/gentoo"
     DISTDIR="/var/cache/binpkgs"
     PKGDIR="/var/cache/binpkgs"
 
-    # Set language settings
     LC_MESSAGES=C
     LANG="en_US.UTF-8"
     L10N="en en-US"
 
-    # Generate the make.conf file
     cat > /etc/portage/make.conf <<EOF
 COMMON_FLAGS="${COMMON_FLAGS}"
 CFLAGS="\${COMMON_FLAGS}"
@@ -62,7 +74,7 @@ L10N=${L10N}
 
 GENTOO_MIRRORS="${GENTOO_MIRRORS}"
 EOF
-    printf "make.conf was set"
+    printf "✅ make.conf was generated!\n\n"
 }
 
 if ! make_conf; then
@@ -73,7 +85,6 @@ fi
 
 function use_flags() {
 
-    # Generate the make.conf file
     cat > /etc/portage/package.use/\* <<EOF
 #################################### GL0BAL ####################################
 #
@@ -89,8 +100,7 @@ function use_flags() {
 */* -cups -crypt
 #################################### L0CAL #####################################
 EOF
-
-    printf "use flags set"
+    printf "✅ USE flags were set!\n\n"
 }
 
 if ! use_flags; then
