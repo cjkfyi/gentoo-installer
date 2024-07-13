@@ -28,7 +28,6 @@ function make_conf() {
     MAKEOPTS="-j12 -l12"
     PORTAGE_NICENESS="1"
 
-    GENTOO_MIRRORS="https://mirrors.mit.edu/gentoo-distfiles/"
     PORTDIR="/var/db/repos/gentoo"
     DISTDIR="/var/cache/binpkgs"
     PKGDIR="/var/cache/binpkgs"
@@ -72,7 +71,7 @@ LC_MESSAGES=${LC_MESSAGES}
 LANG=${LANG}
 L10N=${L10N}
 
-GENTOO_MIRRORS="${GENTOO_MIRRORS}"
+GENTOO_MIRRORS="https://mirrors.mit.edu/gentoo-distfiles/"
 EOF
     printf "✅ make.conf was generated!\n\n"
 }
@@ -117,6 +116,8 @@ function websync() {
     emerge --sync --quiet
 
     printf "✅ emerge-webrsync was ran!\n\n"
+
+    emerge dev-vcs/git eselect-repository 
 }
 
 if ! websync; then
