@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Initialization
+# Initializing
 #
 
 clear
@@ -13,7 +13,7 @@ if ! pacman -Qs gum > /dev/null; then
 fi
 
 #
-# Selecting drive
+# Selecting
 #
 
 function sel_block() {
@@ -118,33 +118,52 @@ if ! fmt_parts; then
 fi
 
 #
-# Preparing Base
+# Preparing Base FS
 #
 
 function prep_base() {
+
+    clear
+
     MNT=$"/mnt/gentoo"
 
-    mkdir --parents ${MNT} > /dev/null
-    mount ${ROOT} ${MNT} > /dev/null
+    mkdir --parents ${MNT}
+    mount ${ROOT} ${MNT}
 
-    mkdir -p ${MNT}/boot/efi > /dev/null
-    mount ${BOOT} ${MNT}/boot/efi > /dev/null
+    mkdir -p ${MNT}/boot/efi 
+    mount ${BOOT} ${MNT}/boot/efi 
 
-    swapon ${SWAP} > /dev/null
+    swapon ${SWAP} 
 
-    btrfs subvolume create ${MNT}/@ > /dev/null
-    btrfs subvolume create ${MNT}/@home > /dev/null
-    btrfs subvolume create ${MNT}/@snapshots > /dev/null
+    btrfs subvolume create ${MNT}/@ 
+    btrfs subvolume create ${MNT}/@home                                                                 
+    btrfs subvolume create ${MNT}/@snapshots
 
-    umount ${MNT} > /dev/null
+    umount -l ${MNT}
 
-    mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@ ${ROOT} ${MNT}
-    
+    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@ ${ROOT} ${MNT}
+
+    mkdir -p ${MNT}/boot/efi
+    mount ${BOOT} ${MNT}/boot/efi
+
     cd ${MNT}
 
-    wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz
+    wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz 
     
     tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner
+
+    cp --dereference /etc/resolv.conf ${MNT}/etc/
+    cp chroot.sh ${MNT}
+
+    mount --types proc /proc ${MNT}/proc
+    mount --rbind /sys ${MNT}/sys
+    mount --make-rslave ${MNT}/sys
+    mount --rbind /dev ${MNT}/dev
+    mount --make-rslave ${MNT}/dev
+    mount --bind /run ${MNT}/run
+    mount --make-slave ${MNT}/run
+
+    chroot ${MNT} /bin/bash -c "chroot.sh"
 }
 
 if ! prep_base; then
