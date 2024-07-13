@@ -166,7 +166,7 @@ function prep_base() {
     mount --bind /run ${MNT}/run
     mount --make-slave ${MNT}/run
 
-    chroot ${MNT} /bin/bash -c "/home/liveuser/Desktop/chroot.sh"
+    chroot ${MNT} /bin/bash -c "./chroot.sh"
 }
 
 if ! prep_base; then
