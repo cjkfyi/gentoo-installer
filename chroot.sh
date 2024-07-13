@@ -48,6 +48,12 @@ function websync() {
 
     emerge dev-vcs/git eselect-repository 
     emerge --oneshot app-portage/cpuid2cpuflags resolve-march-native
+
+    eselect respository enable gentoo
+
+    rm -rf /var/db/repos/gentoo
+
+    emaint sync -r gentoo 
 }
 
 
@@ -85,8 +91,6 @@ PORTAGE_NICENESS=${PORTAGE_NICENESS}
 EMERGE_DEFAULT_OPTS="--ask --tree --verbose --jobs=12 --load-average=12 --with-bdeps y --complete-graph y"
 FEATURES="candy fixlafiles unmerge-orphans parallel-fetch parallel-install"
 
-CPU_FLAGS_X86="aes avx avx2 f16c fma3 mmx mmxext pclmul popcnt rdrand sha sse sse2 sse3 sse4_1 sse4_2 ssse3 vpclmulqdq"
-
 ACCEPT_LICENSE="*"
 ACCEPT_KEYWORDS="~amd64"
 GRUB_PLATFORMS="efi-64"
@@ -96,17 +100,13 @@ INPUT_DEVICES="libinput"
 PORTAGE_TMPDIR="/var/tmp/portage"
 PORTAGE_SCHEDULING_POLICY="idle"
 
-# NOTE: This stage was built with the bindist Use flag enabled
-
 PORTDIR="${PORTDIR}"
 DISTDIR="${DISTDIR}"
 PKGDIR="${PKGDIR}"
 
-# Set language of build output to English.
 LC_MESSAGES=${LC_MESSAGES}
 LANG=${LANG}
 L10N=${L10N}
-
 EOF
     printf "✅ make.conf was generated!\n\n"
 }
