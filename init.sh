@@ -13,10 +13,11 @@ if ! pacman -Qs gum > /dev/null; then
 fi
 
 #
-# Partition Disk
+# Selecting drive
 #
 
 function sel_block() {
+
     clear
 
     local disks=$(lsblk -d -n -oNAME,RO | grep '0$' | awk {'print $1'})
@@ -42,6 +43,8 @@ if ! sel_block; then
     exit 1
 fi
 
+#
+# Partitioning
 #
 
 function part_block() {
@@ -91,6 +94,8 @@ if ! part_block; then
 fi
 
 #
+# Formatting
+#
 
 function fmt_parts() {
 
@@ -104,7 +109,7 @@ function fmt_parts() {
     mkswap ${SWAP} > /dev/null
     printf "✅ SWAP was made!\n\n"
 
-    mkfs.btrfs ${ROOT} > /dev/null
+    mkfs.btrfs -f ${ROOT} > /dev/null
     printf "✅ ROOT was formatted to BTRFS!\n\n"
 }
 
@@ -113,15 +118,17 @@ if ! fmt_parts; then
 fi
 
 #
+# Preparing Base
+#
 
-function prep_fs() {
+function prep_base() {
     MNT=$"/mnt/gentoo"
 
     mkdir --parents ${MNT} > /dev/null
     mount ${ROOT} ${MNT} > /dev/null
 
     mkdir -p ${MNT}/boot/efi > /dev/null
-    mount ${ROOT} ${MNT}/boot/efi > /dev/null
+    mount ${BOOT} ${MNT}/boot/efi > /dev/null
 
     swapon ${SWAP} > /dev/null
 
@@ -129,9 +136,18 @@ function prep_fs() {
     btrfs subvolume create ${MNT}/@home > /dev/null
     btrfs subvolume create ${MNT}/@snapshots > /dev/null
 
-    unmount ${MNT} > /dev/null
+    umount ${MNT} > /dev/null
+
+    mount -t btrfs -o defaults,noatime.compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@ ${ROOT} ${MNT}
+    
+    cd ${MNT}
+
+    wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz
+    
+    tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner
 }
 
-if ! prep_fs; then
+if ! prep_base; then
     exit 1
 fi
+
