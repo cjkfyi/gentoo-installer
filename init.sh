@@ -89,3 +89,25 @@ EOF
 if ! part_block; then
     exit 1
 fi
+
+#
+
+function fmt_parts() {
+
+    BOOT=$(printf "%sp1" "$BLK")
+    SWAP=$(printf "%sp2" "$BLK")
+    ROOT=$(printf "%sp3" "$BLK")
+
+    mkfs.vfat -F 32 ${BOOT} > /dev/null
+    printf "✅ BOOT was formatted to Fat32!\n\n"
+
+    mkswap ${SWAP} > /dev/null
+    printf "✅ SWAP was made!\n\n"
+
+    mkfs.btrfs ${ROOT} > /dev/null
+    printf "✅ ROOT was formatted to BTRFS!\n\n"
+}
+
+if ! fmt_parts; then
+    exit 1
+fi
