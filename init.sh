@@ -111,3 +111,27 @@ function fmt_parts() {
 if ! fmt_parts; then
     exit 1
 fi
+
+#
+
+function prep_fs() {
+    MNT=$"/mnt/gentoo"
+
+    mkdir --parents ${MNT} > /dev/null
+    mount ${ROOT} ${MNT} > /dev/null
+
+    mkdir -p ${MNT}/boot/efi > /dev/null
+    mount ${ROOT} ${MNT}/boot/efi > /dev/null
+
+    swapon ${SWAP} > /dev/null
+
+    btrfs subvolume create ${MNT}/@ > /dev/null
+    btrfs subvolume create ${MNT}/@home > /dev/null
+    btrfs subvolume create ${MNT}/@snapshots > /dev/null
+
+    unmount ${MNT} > /dev/null
+}
+
+if ! prep_fs; then
+    exit 1
+fi
