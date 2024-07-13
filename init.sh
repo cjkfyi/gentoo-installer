@@ -138,6 +138,8 @@ function prep_base() {
     btrfs subvolume create ${MNT}/@ 
     btrfs subvolume create ${MNT}/@home                                                                 
     btrfs subvolume create ${MNT}/@snapshots
+    btrfs subvolume create ${MNT}/@devel
+    btrfs subvolume create ${MNT}/@virt
 
     umount -l ${MNT}
 
@@ -146,6 +148,8 @@ function prep_base() {
     mkdir -p ${MNT}/boot/efi
     mount ${BOOT} ${MNT}/boot/efi
 
+    cp chroot.sh ${MNT}
+
     cd ${MNT}
 
     wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz 
@@ -153,7 +157,6 @@ function prep_base() {
     tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner
 
     cp --dereference /etc/resolv.conf ${MNT}/etc/
-    cp chroot.sh ${MNT}
 
     mount --types proc /proc ${MNT}/proc
     mount --rbind /sys ${MNT}/sys
@@ -163,7 +166,7 @@ function prep_base() {
     mount --bind /run ${MNT}/run
     mount --make-slave ${MNT}/run
 
-    chroot ${MNT} /bin/bash -c "chroot.sh"
+    chroot ${MNT} /bin/bash -c "/home/liveuser/Desktop/chroot.sh"
 }
 
 if ! prep_base; then
