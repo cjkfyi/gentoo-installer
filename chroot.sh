@@ -21,9 +21,45 @@ fi
 
 #
 
+function testing() {
+
+    cat > /etc/locale.gen <<EOF
+en_US.UTF-8 UTF-8
+EOF
+    locale-gen
+
+    printf "✅ locale.gen was modified!\n\n"
+}
+
+if ! testing; then
+    exit 1
+fi
+
+#
+
+function websync() {
+
+    clear
+
+    emerge-webrsync
+    emerge --sync --quiet
+
+    printf "✅ emerge-webrsync was ran!\n\n"
+
+    emerge dev-vcs/git eselect-repository 
+    emerge --oneshot app-portage/cpuid2cpuflags resolve-march-native
+}
+
+
+if ! websync; then
+    exit 1
+fi
+
+#
+
 function make_conf() {
 
-    COMMON_FLAGS="-march=alderlake -mabm -mno-cldemote -mno-kl -mno-sgx -mno-widekl -mshstk --param=l1-cache-line-size=64 --param=l1-cache-size=48 -O2 -pipe"
+    COMMON_FLAGS="-march=native -O2 -pipe"
 
     MAKEOPTS="-j12 -l12"
     PORTAGE_NICENESS="1"
@@ -71,7 +107,6 @@ LC_MESSAGES=${LC_MESSAGES}
 LANG=${LANG}
 L10N=${L10N}
 
-GENTOO_MIRRORS="https://mirrors.mit.edu/gentoo-distfiles/"
 EOF
     printf "✅ make.conf was generated!\n\n"
 }
@@ -108,20 +143,5 @@ fi
 
 #
 
-function websync() {
-
-    clear
-
-    emerge-webrsync
-    emerge --sync --quiet
-
-    printf "✅ emerge-webrsync was ran!\n\n"
-
-    emerge dev-vcs/git eselect-repository 
-}
-
-if ! websync; then
-    exit 1
-fi
 
 
