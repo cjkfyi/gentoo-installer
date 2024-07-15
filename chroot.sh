@@ -46,8 +46,7 @@ function git_sync() {
     emerge-webrsync
     emerge --sync --quiet
 
-    emerge --quiet dev-vcs/git
-    emerge --quiet app-eselect/eselect-repository
+    emerge --quiet dev-vcs/git app-eselect/eselect-repository
 
     eselect repository disable gentoo
     eselect repository enable gentoo

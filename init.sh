@@ -9,8 +9,8 @@ GUM_CMD=gum
 function get_deps() {
     if ! pacman -Qs gum > /dev/null; then
         printf "\n📦 Installing dependencies...\n"
-        pacman -Sy --noconfirm gum jq curl > /dev/null
-        printf "\n✅ Successfully installed gum, jq and curl!\n"
+        pacman -Sy --noconfirm jq curl > /dev/null
+        printf "\n✅ Successfully installed jq and curl!\n"
     fi
 }
 
@@ -36,46 +36,40 @@ function get_gum() {
 
 function set_gum() {
 
-    if gum --help &> /dev/null; then
-        return 0
+    REPO_URL=https://api.github.com/repos/charmbracelet/gum/releases
+    GUM_CACHED_FILE=assets/gum_releases.json
+
+    # Check if we've ran this once before
+    if ! test -f "$GUM_CACHED_FILE"; then
+        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
+        GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
+        GUM_LATEST=${GUM_CACHED_VER}
     else 
+        GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
+        GUM_LATEST=$(curl -sS ${REPO_URL} | jq -r '.[] | .name' | head -n 1)
+    fi
 
-        printf "\n❌ \`gum\` wasn't found. Obtaining.\n\n"
+    GUM_BIN=./assets/gum_${GUM_LATEST}/gum
 
-        REPO_URL=https://api.github.com/repos/charmbracelet/gum/releases
-
-        GUM_CACHED_FILE=assets/gum_releases.json
-
-        # Check if we've ran this once before
-        if ! test -f "$GUM_CACHED_FILE"; then
-            curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
-            GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
-            GUM_LATEST=${GUM_CACHED_VER}
-        else 
-            GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
-            GUM_LATEST=$(curl -sS ${REPO_URL} | jq -r '.[] | .name' | head -n 1)
-        fi
-
-        GUM_BIN=./assets/gum_${GUM_LATEST}/gum
-
-        # Check if the last cached version matches:
-        if [ $GUM_CACHED_VER == $GUM_LATEST ]; then
-            # Check if we have the bin...
-            if ! test -f ${GUM_BIN}; then 
-                if ! get_gum; then
-                    exit 1
-                fi
-            fi
-        else
-            # Versioning difference detected, rm and update
-            rm -rf ./assets/gum_${GUM_CACHED_VER}
-            curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
+    # Check if the last cached version matches:
+    if [ $GUM_CACHED_VER == $GUM_LATEST ]; then
+        # Check if we have the bin...
+        if ! test -f ${GUM_BIN}; then 
+            printf "\n❌ \`gum\` wasn't found. Obtaining...\n\n"
             if ! get_gum; then
                 exit 1
             fi
         fi
+    else
+        # Versioning difference detected, rm and update
+        printf "\n👀 New \`gum\` release detected. Updating...\n\n"
+        rm -rf ./assets/gum_${GUM_CACHED_VER}
+        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
+        if ! get_gum; then
+            exit 1
+        fi
     fi
-
+    
     GUM_CMD=${GUM_BIN}
     
     return 0
@@ -86,21 +80,21 @@ function init() {
     clear
 
     # Ensure privs are met...
-    # if [ $(id -u) != 0 ]; then
-    #     printf "\n❌ Script not ran as root. Exiting.\n\n"
-    #     exit 1
-    # fi
+    if [ $(id -u) != 0 ]; then
+        printf "\n❌ Script not ran as root. Exiting.\n\n"
+        exit 1
+    fi
 
     # Ensure a valid network connection...
-    # if ! ping -c 1 -w 2 google.com &> /dev/null; then 
-    #     printf "\n❌ No internet connection. Exiting.\n\n"
-    #     exit 1
-    # fi
+    if ! ping -c 1 -w 2 google.com &> /dev/null; then 
+        printf "\n❌ No internet connection. Exiting.\n\n"
+        exit 1
+    fi
 
     # Ensure this dir exists...
     mkdir -p ./assets
 
-    if pacman --help > /dev/null; then 
+    if command -v pacman &> /dev/null; then 
         if ! get_deps; then
             exit 1
         fi
@@ -231,6 +225,8 @@ function prep_base() {
 
     swapon ${SWAP} 
 
+    # TODO: Also cp ./assets
+    # Into `${MNT}/tmp/installer`
     cp chroot.sh ${MNT}
 
     cd ${MNT}
