@@ -6,6 +6,14 @@
 
 GUM_CMD=gum
 
+function get_deps() {
+    if ! pacman -Qs gum > /dev/null; then
+        printf "\n📦 Installing dependencies...\n"
+        pacman -Sy --noconfirm gum jq curl > /dev/null
+        printf "\n✅ Successfully installed gum, jq and curl!\n"
+    fi
+}
+
 function get_gum() {
     GUM_FILE_NAME=$(jq -r '.[0].assets[] | select(.name | test("gum_.*_Linux_x86_64.tar.gz")) .name' ${GUM_CACHED_FILE} | 
         head -n 1)
@@ -78,19 +86,25 @@ function init() {
     clear
 
     # Ensure privs are met...
-    if [ $(id -u) != 0 ]; then
-        printf "\n❌ Script not ran as root. Exiting.\n\n"
-        exit 1
-    fi
+    # if [ $(id -u) != 0 ]; then
+    #     printf "\n❌ Script not ran as root. Exiting.\n\n"
+    #     exit 1
+    # fi
 
     # Ensure a valid network connection...
-    if ! ping -c 1 -w 2 google.com &> /dev/null; then 
-        printf "\n❌ No internet connection. Exiting.\n\n"
-        exit 1
-    fi
+    # if ! ping -c 1 -w 2 google.com &> /dev/null; then 
+    #     printf "\n❌ No internet connection. Exiting.\n\n"
+    #     exit 1
+    # fi
 
     # Ensure this dir exists...
     mkdir -p ./assets
+
+    if pacman --help > /dev/null; then 
+        if ! get_deps; then
+            exit 1
+        fi
+    fi
     
     # Ensure `gum` is present...
     if ! set_gum; then
