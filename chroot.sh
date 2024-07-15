@@ -7,10 +7,11 @@ printf "✅ Dropped into chroot!\n\n"
 #
 
 function mnt_subs() {
+
+    mkdir /.snapshots/
+
     mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@snapshots /dev/nvme0n1p3 /.snapshots
     mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@home /dev/nvme0n1p3 /home
-    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@devel /dev/nvme0n1p3 /devel
-    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@virt /dev/nvme0n1p3 /virt
     
     printf "✅ Mounted sub volumes!\n\n"
 }
@@ -24,6 +25,7 @@ fi
 function testing() {
 
     cat > /etc/locale.gen <<EOF
+# Whatever else?
 en_US.UTF-8 UTF-8
 EOF
     locale-gen
@@ -37,46 +39,62 @@ fi
 
 #
 
-function websync() {
+function git_sync() {
 
     clear
 
     emerge-webrsync
     emerge --sync --quiet
 
-    printf "✅ emerge-webrsync was ran!\n\n"
+    emerge --quiet dev-vcs/git
+    emerge --quiet app-eselect/eselect-repository
 
-    emerge dev-vcs/git eselect-repository 
-    emerge --oneshot app-portage/cpuid2cpuflags resolve-march-native
+    eselect repository disable gentoo
+    eselect repository enable gentoo
+    eselect repository enable guru
 
-    eselect respository enable gentoo
+    rm -r /var/db/repos/gentoo
 
-    rm -rf /var/db/repos/gentoo
+    emaint sync 
 
-    emaint sync -r gentoo 
+    printf "✅ Syncing portage with git!\n\n"
 }
 
 
-if ! websync; then
+if ! git_sync; then
+    exit 1
+fi
+
+#
+
+function cpu_flags() {
+
+    clear
+
+    emerge --quiet --oneshot app-portage/cpuid2cpuflags 
+
+    CPU_FLAGS=$(cpuid2cpuflags | cut -d: -f2-)
+
+    MAKEOPTS="-j12 -l12"
+    EMERGE_OPTS="--jobs=12 --load-average=12"
+
+    #
+
+    emerge --quiet --oneshot resolve-march-native
+
+    MARCH=$(resolve-march-native)
+
+    COMMON_FLAGS="${MARCH} -O2 -pipe"
+}
+
+
+if ! cpu_flags; then
     exit 1
 fi
 
 #
 
 function make_conf() {
-
-    COMMON_FLAGS="-march=native -O2 -pipe"
-
-    MAKEOPTS="-j12 -l12"
-    PORTAGE_NICENESS="1"
-
-    PORTDIR="/var/db/repos/gentoo"
-    DISTDIR="/var/cache/binpkgs"
-    PKGDIR="/var/cache/binpkgs"
-
-    LC_MESSAGES=C
-    LANG="en_US.UTF-8"
-    L10N="en en-US"
 
     cat > /etc/portage/make.conf <<EOF
 COMMON_FLAGS="${COMMON_FLAGS}"
@@ -85,10 +103,12 @@ CXXFLAGS="\${COMMON_FLAGS}"
 FCFLAGS="\${COMMON_FLAGS}"
 FFLAGS="\${COMMON_FLAGS}"
 
-MAKEOPTS="${MAKEOPTS}"
-PORTAGE_NICENESS=${PORTAGE_NICENESS}
+CPU_FLAGS_X86="${CPU_FLAGS}"
 
-EMERGE_DEFAULT_OPTS="--ask --tree --verbose --jobs=12 --load-average=12 --with-bdeps y --complete-graph y"
+MAKEOPTS="${MAKEOPTS}"
+PORTAGE_NICENESS="1"
+
+EMERGE_DEFAULT_OPTS="--ask --tree --verbose ${EMERGE_OPTS} --with-bdeps y --complete-graph y"
 FEATURES="candy fixlafiles unmerge-orphans parallel-fetch parallel-install"
 
 ACCEPT_LICENSE="*"
@@ -100,13 +120,13 @@ INPUT_DEVICES="libinput"
 PORTAGE_TMPDIR="/var/tmp/portage"
 PORTAGE_SCHEDULING_POLICY="idle"
 
-PORTDIR="${PORTDIR}"
-DISTDIR="${DISTDIR}"
-PKGDIR="${PKGDIR}"
+PORTDIR="/var/db/repos/gentoo"
+DISTDIR="/var/cache/binpkgs"
+PKGDIR="/var/cache/binpkgs"
 
-LC_MESSAGES=${LC_MESSAGES}
-LANG=${LANG}
-L10N=${L10N}
+LC_MESSAGES="C"
+LANG="en_US.UTF-8"
+L10N="en en-US"
 EOF
     printf "✅ make.conf was generated!\n\n"
 }

@@ -4,13 +4,101 @@
 # Initializing
 #
 
-clear
+GUM_CMD=gum
 
-if ! pacman -Qs gum > /dev/null; then
-    printf "\n📦 Installing the pkg gum...\n"
-    pacman -Sy --noconfirm gum > /dev/null
-    printf "\n✅ Successfully installed gum!\n"
-fi
+function get_gum() {
+    GUM_FILE_NAME=$(jq -r '.[0].assets[] | select(.name | test("gum_.*_Linux_x86_64.tar.gz")) .name' ${GUM_CACHED_FILE} | 
+        head -n 1)
+    GUM_URL=$(jq -r '.[0].assets[] | select(.name | test("gum_.*_Linux_x86_64.tar.gz")) .browser_download_url' ${GUM_CACHED_FILE} | 
+        head -n 1)
+
+    OLD_GUM_DIR=${GUM_FILE_NAME%.tar.gz}
+    NEW_GUM_DIR=./assets/gum_${GUM_LATEST}
+
+    mkdir $NEW_GUM_DIR &> /dev/null
+
+    curl -L ${GUM_URL} -o ./assets/${GUM_FILE_NAME} &> /dev/null
+    tar -xf ./assets/${GUM_FILE_NAME} -C ./assets/ &> /dev/null
+    mv ./assets/${OLD_GUM_DIR}/gum $NEW_GUM_DIR &> /dev/null
+    rm -rf ./assets/${OLD_GUM_DIR} &> /dev/null
+    rm ./assets/${GUM_FILE_NAME} &> /dev/null
+
+    return 0
+}
+
+function set_gum() {
+
+    if gum --help &> /dev/null; then
+        return 0
+    else 
+
+        printf "\n❌ \`gum\` wasn't found. Obtaining.\n\n"
+
+        REPO_URL=https://api.github.com/repos/charmbracelet/gum/releases
+
+        GUM_CACHED_FILE=assets/gum_releases.json
+
+        # Check if we've ran this once before
+        if ! test -f "$GUM_CACHED_FILE"; then
+            curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
+            GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
+            GUM_LATEST=${GUM_CACHED_VER}
+        else 
+            GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
+            GUM_LATEST=$(curl -sS ${REPO_URL} | jq -r '.[] | .name' | head -n 1)
+        fi
+
+        GUM_BIN=./assets/gum_${GUM_LATEST}/gum
+
+        # Check if the last cached version matches:
+        if [ $GUM_CACHED_VER == $GUM_LATEST ]; then
+            # Check if we have the bin...
+            if ! test -f ${GUM_BIN}; then 
+                if ! get_gum; then
+                    exit 1
+                fi
+            fi
+        else
+            # Versioning difference detected, rm and update
+            rm -rf ./assets/gum_${GUM_CACHED_VER}
+            curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
+            if ! get_gum; then
+                exit 1
+            fi
+        fi
+    fi
+
+    GUM_CMD=${GUM_BIN}
+    
+    return 0
+}
+
+function init() {
+
+    clear
+
+    # Ensure privs are met...
+    if [ $(id -u) != 0 ]; then
+        printf "\n❌ Script not ran as root. Exiting.\n\n"
+        exit 1
+    fi
+
+    # Ensure a valid network connection...
+    if ! ping -c 1 -w 2 google.com &> /dev/null; then 
+        printf "\n❌ No internet connection. Exiting.\n\n"
+        exit 1
+    fi
+
+    # Ensure this dir exists...
+    mkdir -p ./assets
+    
+    # Ensure `gum` is present...
+    if ! set_gum; then
+        exit 1
+    fi
+    
+    return 0
+}
 
 #
 # Selecting
@@ -21,8 +109,7 @@ function sel_block() {
     clear
 
     local disks=$(lsblk -d -n -oNAME,RO | grep '0$' | awk {'print $1'})
-    DEV_BLK=$(gum choose --limit 1 --header "Device block to partition:" <<< "$disks")
-
+    DEV_BLK=$($GUM_CMD choose --limit 1 --header "Device block to partition:" <<< "$disks")
     if [[ -z "$DEV_BLK" ]]; then
         printf "\n❌ No valid block device was selected...\n\nTry again?\n\n"
         return 1
@@ -30,7 +117,7 @@ function sel_block() {
 
     BLK=$"/dev/$DEV_BLK"
 
-    if gum confirm "So, we're installing Gentoo on $BLK?"; then
+    if $GUM_CMD confirm "So, we're installing Gentoo on $BLK?"; then
         printf "\n⌛ Time to partition $BLK...\n\n"
     else
         sel_block
@@ -39,23 +126,19 @@ function sel_block() {
     return 0
 }
 
-if ! sel_block; then
-    exit 1
-fi
-
 #
 # Partitioning
 #
 
 function part_block() {
 
-    BOOT_SIZE=$(gum input --width 120 \
+    BOOT_SIZE=$($GUM_CMD input --width 120 \
         --value 120 \
         --prompt "👉 Input the size in MB for your BOOT partition: " | head -n 1)
 
     BOOT_SECTORS=$(($BOOT_SIZE * 1048576 / 512))
 
-    SWAP_SIZE=$(gum input --width 120 \
+    SWAP_SIZE=$($GUM_CMD input --width 120 \
         --value 32000 \
         --prompt "👉 Input the size in MB for your SWAP partition: " | head -n 1)
 
@@ -88,17 +171,11 @@ EOF
     return 0
 }
 
-
-if ! part_block; then
-    exit 1
-fi
-
 #
 # Formatting
 #
 
 function fmt_parts() {
-
     BOOT=$(printf "%sp1" "$BLK")
     SWAP=$(printf "%sp2" "$BLK")
     ROOT=$(printf "%sp3" "$BLK")
@@ -113,9 +190,6 @@ function fmt_parts() {
     printf "✅ ROOT was formatted to BTRFS!\n\n"
 }
 
-if ! fmt_parts; then
-    exit 1
-fi
 
 #
 # Preparing Base FS
@@ -130,16 +204,9 @@ function prep_base() {
     mkdir --parents ${MNT}
     mount ${ROOT} ${MNT}
 
-    mkdir -p ${MNT}/boot/efi 
-    mount ${BOOT} ${MNT}/boot/efi 
-
-    swapon ${SWAP} 
-
     btrfs subvolume create ${MNT}/@ 
     btrfs subvolume create ${MNT}/@home                                                                 
     btrfs subvolume create ${MNT}/@snapshots
-    btrfs subvolume create ${MNT}/@devel
-    btrfs subvolume create ${MNT}/@virt
 
     umount -l ${MNT}
 
@@ -148,10 +215,13 @@ function prep_base() {
     mkdir -p ${MNT}/boot/efi
     mount ${BOOT} ${MNT}/boot/efi
 
+    swapon ${SWAP} 
+
     cp chroot.sh ${MNT}
 
     cd ${MNT}
 
+    # TODO: Pull the latest version
     wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz 
     
     tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner
@@ -166,13 +236,34 @@ function prep_base() {
     mount --bind /run ${MNT}/run
     mount --make-slave ${MNT}/run
 
-    mkdir ${MNT}/.snapshots
-    mkdir ${MNT}/devel
-    mkdir ${MNT}/virt
-
     chroot ${MNT} /bin/bash -c "./chroot.sh"
 }
 
-if ! prep_base; then
-    exit 1
-fi
+#
+#  Heart of it all
+#
+
+function installer() {
+
+    if ! init; then
+        exit 1
+    fi
+
+    if ! sel_block; then
+        exit 1
+    fi
+
+    if ! part_block; then
+        exit 1
+    fi
+
+    if ! fmt_parts; then
+        exit 1
+    fi
+    
+    if ! prep_base; then
+        exit 1
+    fi
+}
+
+installer
