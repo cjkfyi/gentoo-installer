@@ -4,8 +4,6 @@
 # Initializing
 #
 
-GUM_CMD=gum
-
 function get_deps() {
     if ! pacman -Qs gum > /dev/null; then
         printf "\n📦 Installing dependencies...\n"
@@ -225,9 +223,15 @@ function prep_base() {
 
     swapon ${SWAP} 
 
-    # TODO: Also cp ./assets
-    # Into `${MNT}/tmp/installer`
-    cp chroot.sh ${MNT}
+    #
+
+    TMP_DIR=${MNT}/tmp/installer/
+    mkdir -p ${TMP_DIR}
+
+    cp chroot.sh ${TMP_DIR}
+    cp ${GUM_BIN} ${TMP_DIR}
+
+    #
 
     cd ${MNT}
 
@@ -246,7 +250,7 @@ function prep_base() {
     mount --bind /run ${MNT}/run
     mount --make-slave ${MNT}/run
 
-    chroot ${MNT} /bin/bash -c "./chroot.sh"
+    chroot ${MNT} /bin/bash -c "/tmp/installer/chroot.sh"
 }
 
 #
