@@ -5,10 +5,15 @@
 #
 
 function get_deps() {
-    if ! pacman -Qs gum > /dev/null; then
-        printf "\n📦 Installing dependencies...\n"
-        pacman -Sy --noconfirm jq curl > /dev/null
-        printf "\n✅ Successfully installed jq and curl!\n"
+    if ! pacman -Qs jq > /dev/null; then
+        printf "\n📦 Installing the pkg \`jq\`...\n"
+        pacman -Sy --noconfirm jq  > /dev/null
+        printf "\n✅ Successfully installed \`jq\`!\n"
+    fi
+    if ! pacman -Qs curl > /dev/null; then
+        printf "\n📦 Installing the pkg \`curl\`...\n"
+        pacman -Sy --noconfirm curl > /dev/null
+        printf "\n✅ Successfully installed \`curl\`!\n"
     fi
 }
 
@@ -93,11 +98,11 @@ function init() {
     mkdir -p ./assets
 
 #   TODO: check if the deps are already installed...
-#     if command -v pacman &> /dev/null; then
-#         if ! get_deps; then
-#             exit 1
-#         fi
-#     fi
+    if command -v pacman &> /dev/null; then
+        if ! get_deps; then
+            exit 1
+        fi
+    fi
     
     # Ensure `gum` is present...
     if ! set_gum; then
