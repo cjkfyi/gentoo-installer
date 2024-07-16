@@ -8,10 +8,10 @@ printf "✅ Dropped into chroot!\n\n"
 
 function mnt_subs() {
 
-    mkdir /.snapshots/
+    mkdir /.snapshots/ > /dev/null 2>&1
 
-    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@snapshots /dev/nvme0n1p3 /.snapshots
-    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@home /dev/nvme0n1p3 /home
+    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@snapshots /dev/nvme0n1p3 /.snapshots > /dev/null 2>&1
+    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@home /dev/nvme0n1p3 /home > /dev/null 2>&1
     
     printf "✅ Mounted sub volumes!\n\n"
 }
@@ -28,7 +28,7 @@ function testing() {
 # Whatever else?
 en_US.UTF-8 UTF-8
 EOF
-    locale-gen
+    locale-gen > /dev/null 2>&1
 
     printf "✅ locale.gen was modified!\n\n"
 }
@@ -43,18 +43,18 @@ function git_sync() {
 
     clear
 
-    emerge-webrsync
-    emerge --sync --quiet
+    emerge-webrsync > /dev/null 2>&1
+    emerge --sync --quiet > /dev/null 2>&1
 
-    emerge --quiet dev-vcs/git app-eselect/eselect-repository
+    emerge --quiet dev-vcs/git app-eselect/eselect-repository > /dev/null 2>&1
 
-    eselect repository disable gentoo
-    eselect repository enable gentoo
-    eselect repository enable guru
+    eselect repository disable gentoo > /dev/null 2>&1
+    eselect repository enable gentoo > /dev/null 2>&1
+    eselect repository enable guru > /dev/null 2>&1
 
-    rm -r /var/db/repos/gentoo
+    rm -r /var/db/repos/gentoo > /dev/null 2>&1
 
-    emaint sync 
+    emaint sync > /dev/null 2>&1
 
     printf "✅ Syncing portage with git!\n\n"
 }
@@ -70,7 +70,7 @@ function cpu_flags() {
 
     clear
 
-    emerge --quiet --oneshot app-portage/cpuid2cpuflags 
+    emerge --quiet --oneshot app-portage/cpuid2cpuflags > /dev/null 2>&1
 
     CPU_FLAGS=$(cpuid2cpuflags | cut -d: -f2-)
 
@@ -79,7 +79,7 @@ function cpu_flags() {
 
     #
 
-    emerge --quiet --oneshot resolve-march-native
+    emerge --quiet --oneshot resolve-march-native > /dev/null 2>&1
 
     MARCH=$(resolve-march-native)
 

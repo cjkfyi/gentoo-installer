@@ -21,13 +21,13 @@ function get_gum() {
     OLD_GUM_DIR=${GUM_FILE_NAME%.tar.gz}
     NEW_GUM_DIR=./assets/gum_${GUM_LATEST}
 
-    mkdir $NEW_GUM_DIR &> /dev/null
+    mkdir $NEW_GUM_DIR > /dev/null 2>&1
 
-    curl -L ${GUM_URL} -o ./assets/${GUM_FILE_NAME} &> /dev/null
-    tar -xf ./assets/${GUM_FILE_NAME} -C ./assets/ &> /dev/null
-    mv ./assets/${OLD_GUM_DIR}/gum $NEW_GUM_DIR &> /dev/null
-    rm -rf ./assets/${OLD_GUM_DIR} &> /dev/null
-    rm ./assets/${GUM_FILE_NAME} &> /dev/null
+    curl -L ${GUM_URL} -o ./assets/${GUM_FILE_NAME} > /dev/null 2>&1
+    tar -xf ./assets/${GUM_FILE_NAME} -C ./assets/ > /dev/null 2>&1
+    mv ./assets/${OLD_GUM_DIR}/gum $NEW_GUM_DIR > /dev/null 2>&1
+    rm -rf ./assets/${OLD_GUM_DIR} > /dev/null 2>&1
+    rm ./assets/${GUM_FILE_NAME} > /dev/null 2>&1
 
     return 0
 }
@@ -39,7 +39,7 @@ function set_gum() {
 
     # Check if we've ran this once before
     if ! test -f "$GUM_CACHED_FILE"; then
-        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
+        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE} > /dev/null 2>&1
         GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
         GUM_LATEST=${GUM_CACHED_VER}
     else 
@@ -61,8 +61,8 @@ function set_gum() {
     else
         # Versioning difference detected, rm and update
         printf "\n👀 New \`gum\` release detected. Updating...\n\n"
-        rm -rf ./assets/gum_${GUM_CACHED_VER}
-        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
+        rm -rf ./assets/gum_${GUM_CACHED_VER} > /dev/null 2>&1
+        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE} > /dev/null 2>&1
         if ! get_gum; then
             exit 1
         fi
@@ -152,7 +152,7 @@ function part_block() {
 
     BOTH_SECTORS=$(($BOOT_SECTORS + $SWAP_SECTORS + 4098))
 
-    sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${BLK} > /dev/null
+    sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${BLK} > /dev/null 2>&1
       g # new GPT
       n # new partition
       1 # default partition 1
@@ -186,13 +186,13 @@ function fmt_parts() {
     SWAP=$(printf "%sp2" "$BLK")
     ROOT=$(printf "%sp3" "$BLK")
 
-    mkfs.vfat -F 32 ${BOOT} > /dev/null
+    mkfs.vfat -F 32 ${BOOT} > /dev/null 2>&1
     printf "✅ BOOT was formatted to Fat32!\n\n"
 
-    mkswap ${SWAP} > /dev/null
+    mkswap ${SWAP} > /dev/null 2>&1
     printf "✅ SWAP was made!\n\n"
 
-    mkfs.btrfs -f ${ROOT} > /dev/null
+    mkfs.btrfs -f ${ROOT} > /dev/null 2>&1
     printf "✅ ROOT was formatted to BTRFS!\n\n"
 }
 
@@ -207,50 +207,47 @@ function prep_base() {
 
     MNT=$"/mnt/gentoo"
 
-    mkdir --parents ${MNT}
-    mount ${ROOT} ${MNT}
+    mkdir --parents ${MNT} > /dev/null 2>&1
+    mount ${ROOT} ${MNT} > /dev/null 2>&1
 
-    btrfs subvolume create ${MNT}/@ 
-    btrfs subvolume create ${MNT}/@home                                                                 
-    btrfs subvolume create ${MNT}/@snapshots
+    btrfs subvolume create ${MNT}/@ > /dev/null 2>&1
+    btrfs subvolume create ${MNT}/@home > /dev/null 2>&1
+    btrfs subvolume create ${MNT}/@snapshots > /dev/null 2>&1
 
-    umount -l ${MNT}
+    umount -l ${MNT} > /dev/null 2>&1
 
-    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@ ${ROOT} ${MNT}
+    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@ ${ROOT} ${MNT} > /dev/null 2>&1
 
-    mkdir -p ${MNT}/boot/efi
-    mount ${BOOT} ${MNT}/boot/efi
+    mkdir -p ${MNT}/boot/efi > /dev/null 2>&1
+    mount ${BOOT} ${MNT}/boot/efi > /dev/null 2>&1
 
-    swapon ${SWAP} 
-
-    #
-
-    TMP_DIR=${MNT}/tmp/installer/
-    mkdir -p ${TMP_DIR}
-
-    cp chroot.sh ${TMP_DIR}
-    cp ${GUM_BIN} ${TMP_DIR}
+    swapon ${SWAP} > /dev/null 2>&1
 
     #
 
-    cd ${MNT}
+    cp chroot.sh ${MNT} > /dev/null 2>&1
+    cp ${GUM_BIN} ${MNT} > /dev/null 2>&1
+
+    #
+
+    cd ${MNT} > /dev/null 2>&1
 
     # TODO: Pull the latest version
-    wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz 
+    wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz > /dev/null 2>&1
     
-    tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner
+    tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner > /dev/null 2>&1
 
-    cp --dereference /etc/resolv.conf ${MNT}/etc/
+    cp --dereference /etc/resolv.conf ${MNT}/etc/ > /dev/null 2>&1
 
-    mount --types proc /proc ${MNT}/proc
-    mount --rbind /sys ${MNT}/sys
-    mount --make-rslave ${MNT}/sys
-    mount --rbind /dev ${MNT}/dev
-    mount --make-rslave ${MNT}/dev
-    mount --bind /run ${MNT}/run
-    mount --make-slave ${MNT}/run
+    mount --types proc /proc ${MNT}/proc > /dev/null 2>&1
+    mount --rbind /sys ${MNT}/sys > /dev/null 2>&1
+    mount --make-rslave ${MNT}/sys > /dev/null 2>&1
+    mount --rbind /dev ${MNT}/dev > /dev/null 2>&1
+    mount --make-rslave ${MNT}/dev > /dev/null 2>&1
+    mount --bind /run ${MNT}/run > /dev/null 2>&1
+    mount --make-slave ${MNT}/run> /dev/null 2>&1 
 
-    chroot ${MNT} /bin/bash -c "/tmp/installer/chroot.sh"
+    chroot ${MNT} /bin/bash -c "${MNT}/tmp/installer/chroot.sh" 
 }
 
 #
