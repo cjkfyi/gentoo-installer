@@ -35,11 +35,11 @@ function get_gum() {
 function set_gum() {
 
     REPO_URL=https://api.github.com/repos/charmbracelet/gum/releases
-    GUM_CACHED_FILE=assets/gum_releases.json
+    GUM_CACHED_FILE=./assets/gum_releases.json
 
     # Check if we've ran this once before
     if ! test -f "$GUM_CACHED_FILE"; then
-        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE} > /dev/null 2>&1
+        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
         GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
         GUM_LATEST=${GUM_CACHED_VER}
     else 
@@ -67,7 +67,7 @@ function set_gum() {
             exit 1
         fi
     fi
-    
+
     GUM_CMD=${GUM_BIN}
     
     return 0
@@ -84,7 +84,7 @@ function init() {
     fi
 
     # Ensure a valid network connection...
-    if ! ping -c 1 -w 2 google.com &> /dev/null; then 
+    if ! ping -c 1 -w 2 google.com &> /dev/null; then
         printf "\n❌ No internet connection. Exiting.\n\n"
         exit 1
     fi
@@ -92,11 +92,12 @@ function init() {
     # Ensure this dir exists...
     mkdir -p ./assets
 
-    if command -v pacman &> /dev/null; then 
-        if ! get_deps; then
-            exit 1
-        fi
-    fi
+#   TODO: check if the deps are already installed...
+#     if command -v pacman &> /dev/null; then
+#         if ! get_deps; then
+#             exit 1
+#         fi
+#     fi
     
     # Ensure `gum` is present...
     if ! set_gum; then
@@ -247,7 +248,7 @@ function prep_base() {
     mount --bind /run ${MNT}/run > /dev/null 2>&1
     mount --make-slave ${MNT}/run> /dev/null 2>&1 
 
-    chroot ${MNT} /bin/bash -c "${MNT}/tmp/installer/chroot.sh" 
+    chroot ${MNT} /bin/bash -c "${MNT}/chroot.sh" 
 }
 
 #
@@ -271,7 +272,7 @@ function installer() {
     if ! fmt_parts; then
         exit 1
     fi
-    
+
     if ! prep_base; then
         exit 1
     fi

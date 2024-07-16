@@ -2,6 +2,8 @@
 
 printf "✅ Dropped into chroot!\n\n"
 
+GUM_CMD=./gum
+
 #
 # Formatting
 #
