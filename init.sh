@@ -209,8 +209,6 @@ function fmt_parts() {
 
 function prep_base() {
 
-    clear
-
     MNT=$"/mnt/gentoo"
 
     mkdir --parents ${MNT} > /dev/null 2>&1
@@ -221,6 +219,8 @@ function prep_base() {
     btrfs subvolume create ${MNT}/@snapshots > /dev/null 2>&1
 
     umount -l ${MNT} > /dev/null 2>&1
+
+    printf "✅ Sub-volumes were created!\n\n"
 
     mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@ ${ROOT} ${MNT} > /dev/null 2>&1
 
@@ -234,6 +234,8 @@ function prep_base() {
     cp chroot.sh ${MNT} > /dev/null 2>&1
     cp ${GUM_BIN} ${MNT} > /dev/null 2>&1
 
+    printf "✅ Copied over required assets!\n\n"
+
     #
 
     cd ${MNT} > /dev/null 2>&1
@@ -241,7 +243,11 @@ function prep_base() {
     # TODO: Pull the latest version
     wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz > /dev/null 2>&1
     
+    printf "✅ Downloaded the latest stage3!\n\n"
+
     tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner > /dev/null 2>&1
+
+    printf "✅ Extracted the base fs into ${MNT}!\n\n"
 
     cp --dereference /etc/resolv.conf ${MNT}/etc/ > /dev/null 2>&1
 
@@ -253,7 +259,9 @@ function prep_base() {
     mount --bind /run ${MNT}/run > /dev/null 2>&1
     mount --make-slave ${MNT}/run> /dev/null 2>&1 
 
-    chroot ${MNT} /bin/bash -c "${MNT}/chroot.sh" 
+    printf "✅ Extracted the base fs into ${MNT}!\n\n"
+
+    chroot ${MNT} /bin/bash -c "./chroot.sh" 
 }
 
 #

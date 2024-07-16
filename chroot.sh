@@ -18,13 +18,9 @@ function mnt_subs() {
     printf "✅ Mounted sub volumes!\n\n"
 }
 
-if ! mnt_subs; then
-    exit 1
-fi
-
 #
 
-function testing() {
+function locale_gen() {
 
     cat > /etc/locale.gen <<EOF
 # Whatever else?
@@ -35,22 +31,18 @@ EOF
     printf "✅ locale.gen was modified!\n\n"
 }
 
-if ! testing; then
-    exit 1
-fi
-
+#
+#  Portage fun
 #
 
+# Sync with git instead
 function git_sync() {
-
-    clear
 
     emerge-webrsync > /dev/null 2>&1
     emerge --sync --quiet > /dev/null 2>&1
 
     emerge --quiet dev-vcs/git app-eselect/eselect-repository > /dev/null 2>&1
 
-    eselect repository disable gentoo > /dev/null 2>&1
     eselect repository enable gentoo > /dev/null 2>&1
     eselect repository enable guru > /dev/null 2>&1
 
@@ -61,16 +53,8 @@ function git_sync() {
     printf "✅ Syncing portage with git!\n\n"
 }
 
-
-if ! git_sync; then
-    exit 1
-fi
-
-#
-
+# Establish proper vals
 function cpu_flags() {
-
-    clear
 
     emerge --quiet --oneshot app-portage/cpuid2cpuflags > /dev/null 2>&1
 
@@ -88,15 +72,7 @@ function cpu_flags() {
     COMMON_FLAGS="${MARCH} -O2 -pipe"
 }
 
-
-if ! cpu_flags; then
-    exit 1
-fi
-
-#
-
-function make_conf() {
-
+function mk_conf() {
     cat > /etc/portage/make.conf <<EOF
 COMMON_FLAGS="${COMMON_FLAGS}"
 CFLAGS="\${COMMON_FLAGS}"
@@ -132,10 +108,6 @@ EOF
     printf "✅ make.conf was generated!\n\n"
 }
 
-if ! make_conf; then
-    exit 1
-fi
-
 #
 
 function use_flags() {
@@ -158,11 +130,45 @@ EOF
     printf "✅ USE flags were set!\n\n"
 }
 
-if ! use_flags; then
-    exit 1
-fi
+#
+
+function portage() {
+
+    if ! git_sync; then
+        exit 1
+    fi
+        
+    if ! cpu_flags; then
+        exit 1
+    fi
+    
+    if ! mk_conf; then
+        exit 1
+    fi
+
+    if ! use_flags; then
+        exit 1
+    fi
+    
+    return 0
+}
 
 #
 
+function rooted() {
 
+    if ! mnt_subs; then
+        exit 1
+    fi
+
+    if ! locale_gen; then
+        exit 1
+    fi
+
+    if ! portage; then
+        exit 1
+    fi
+}
+
+rooted
 
