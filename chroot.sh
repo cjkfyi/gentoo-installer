@@ -2,12 +2,10 @@
 
 printf "✅ Dropped into chroot!\n\n"
 
+# gum bin loc
 GUM_CMD=./gum
 
-#
-# Formatting
-#
-
+# Mounting sub-volumes
 function mnt_subs() {
 
     mkdir /.snapshots/ > /dev/null 2>&1
@@ -20,6 +18,7 @@ function mnt_subs() {
 
 #
 
+# Setting locale
 function locale_gen() {
 
     cat > /etc/locale.gen <<EOF
@@ -32,7 +31,7 @@ EOF
 }
 
 #
-#  Portage fun
+#  Portage stuff
 #
 
 # Sync with git instead
@@ -72,6 +71,7 @@ function cpu_flags() {
     COMMON_FLAGS="${MARCH} -O2 -pipe"
 }
 
+# Gen make.conf
 function mk_conf() {
     cat > /etc/portage/make.conf <<EOF
 COMMON_FLAGS="${COMMON_FLAGS}"
@@ -110,6 +110,7 @@ EOF
 
 #
 
+# Gen package.use/*
 function use_flags() {
 
     cat > /etc/portage/package.use/\* <<EOF
@@ -154,8 +155,10 @@ function portage() {
 }
 
 #
+#  Heart of this script
+#
 
-function rooted() {
+function chroot() {
 
     if ! mnt_subs; then
         exit 1
@@ -170,5 +173,5 @@ function rooted() {
     fi
 }
 
-rooted
+chroot
 

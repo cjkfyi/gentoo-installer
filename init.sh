@@ -4,6 +4,7 @@
 # Initializing
 #
 
+# Install dependencies
 function get_deps() {
     if ! pacman -Qs jq > /dev/null; then
         printf "\n📦 Installing the pkg \`jq\`...\n"
@@ -17,6 +18,7 @@ function get_deps() {
     fi
 }
 
+# Fetch gum bin
 function get_gum() {
     GUM_FILE_NAME=$(jq -r '.[0].assets[] | select(.name | test("gum_.*_Linux_x86_64.tar.gz")) .name' ${GUM_CACHED_FILE} | 
         head -n 1)
@@ -37,6 +39,7 @@ function get_gum() {
     return 0
 }
 
+# Establish bin location
 function set_gum() {
 
     REPO_URL=https://api.github.com/repos/charmbracelet/gum/releases
@@ -64,7 +67,7 @@ function set_gum() {
             fi
         fi
     else
-        # Versioning difference detected, rm and update
+        # Versioning difference detected, rm and update...
         printf "\n👀 New \`gum\` release detected. Updating...\n\n"
         rm -rf ./assets/gum_${GUM_CACHED_VER} > /dev/null 2>&1
         curl -sS ${REPO_URL} > ${GUM_CACHED_FILE} > /dev/null 2>&1
@@ -73,11 +76,13 @@ function set_gum() {
         fi
     fi
 
+    # Set gum bin loc
     GUM_CMD=${GUM_BIN}
     
     return 0
 }
 
+# Initialization
 function init() {
 
     clear
@@ -97,7 +102,7 @@ function init() {
     # Ensure this dir exists...
     mkdir -p ./assets
 
-#   TODO: check if the deps are already installed...
+    # Ensure dependencies are installed...
     if command -v pacman &> /dev/null; then
         if ! get_deps; then
             exit 1
@@ -113,7 +118,7 @@ function init() {
 }
 
 #
-# Selecting
+# Block Selection
 #
 
 function sel_block() {
