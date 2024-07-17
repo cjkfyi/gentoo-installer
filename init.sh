@@ -18,6 +18,8 @@ function get_deps() {
         pacman -Sy --noconfirm curl > /dev/null
         printf "\n✅ Successfully installed \`curl\`!\n"
     fi
+
+    return 0
 }
 
 # Fetch gum bin
@@ -209,6 +211,8 @@ function fmt_parts() {
 
     mkfs.btrfs -f ${ROOT} > /dev/null 2>&1
     printf "✅ ROOT was formatted to BTRFS!\n\n"
+
+    return 0
 }
 
 #
@@ -265,7 +269,8 @@ function get_base() {
     # If we haven't ran this before...
     if test -z "$OLD_BASE_LOC"; then
 
-        $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- curl -L ${BASE_FILE_URL} -o ${NEW_BASE_FILE}
+        $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- \
+            curl -L ${BASE_FILE_URL} -o ${NEW_BASE_FILE}
 
         printf "✅ Downloaded the latest stage3 tarball!\n\n"
 
@@ -277,14 +282,11 @@ function get_base() {
 
         rm ${OLD_BASE_LOC}
         
-        $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- curl -L ${BASE_FILE_URL} -o ${NEW_BASE_FILE}
-
+        $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- \
+            curl -L ${BASE_FILE_URL} -o ${NEW_BASE_FILE}
         printf "✅ Downloaded the latest stage3 tarball!\n\n"
-
     else 
-
         printf "✅ Reusing our latest stage3 tarball!\n\n"
-
     fi
 
     return 0
@@ -342,6 +344,8 @@ function prep_base() {
     printf "✅ Extracted the base fs into ${MNT}!\n\n"
 
     chroot ${MNT} /bin/bash -c "./chroot.sh" 
+
+    return 0
 }
 
 #
