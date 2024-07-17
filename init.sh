@@ -229,8 +229,6 @@ function cp_scripts() {
 
 function ext_base() {
 
-    echo "$MNT"
-
     $GUM_CMD spin --spinner line --title "Extracting the base fs..." -- \
         tar xpvf ./assets/stage3-*.tar.xz -C "${MNT}" --xattrs-include='*.*' --numeric-owner 
 
