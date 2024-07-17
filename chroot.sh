@@ -40,22 +40,22 @@ EOF
 function git_sync() {
 
     $GUM_CMD spin --spinner line --title "running \`emerge-webrsync\`..." -- \
-        emerge-webrsync > /dev/null 2>&1
+        emerge-webrsync 
 
     $GUM_CMD spin --spinner line --title "running \`emerge --sync\`..." -- \
-        emerge --sync > /dev/null 2>&1
+        emerge --sync
     
     $GUM_CMD spin --spinner line --title "running \`emerge dev-vcs/git app-eselect/eselect-repository\`..." -- \
-        emerge dev-vcs/git app-eselect/eselect-repository > /dev/null 2>&1
+        emerge dev-vcs/git app-eselect/eselect-repository
 
     eselect repository enable gentoo > /dev/null 2>&1
     eselect repository enable guru > /dev/null 2>&1
 
     $GUM_CMD spin --spinner line --title "running \`rm -r /var/db/repos/gentoo\`..." -- \
-        rm -r /var/db/repos/gentoo > /dev/null 2>&1
+        rm -r /var/db/repos/gentoo
 
     $GUM_CMD spin --spinner line --title "running \`emaint sync\`..." -- \
-        emaint sync > /dev/null 2>&1
+        emaint sync
     
     printf "✅ Syncing portage with git!\n\n"
 
@@ -70,7 +70,7 @@ function cpu_flags() {
 
     CPU_FLAGS=$(cpuid2cpuflags | cut -d: -f2-)
 
-    MAKEOPTS="-j12 -l12"
+    MAKEOPTS_DEFAULT="-j12 -l12"
     EMERGE_OPTS="--jobs=12 --load-average=12"
 
     #
@@ -88,6 +88,7 @@ function cpu_flags() {
 #
 
 function gpu_check() {
+
     GPU_VAL=$($GUM_CMD choose --limit 1 --header "GPU?" "amd" "nvidia" "intel")
     if [[ -z "$GPU_VAL" ]]; then
         printf "\n❌ No GPU was selected...\n\nTry again?\n\n"
@@ -104,10 +105,48 @@ function kb_check() {
     return 0
 }
 
-#
+# Generate MAKEOPTS...
+function gen_makeopts() {
+    nproc_threads=$(nproc)
+    ram_gb=$(grep MemTotal /proc/meminfo | awk '{print $2 / 1024}')
 
-# Gen make.conf
+    makeopts=$(echo "min($ram_gb/2, $nproc_threads)" | bc -l)
+
+    # makeopts="-j${nproc_threads} -l$(bc -l <<< "scale=0; ${nproc_threads} * 1.25")"
+
+    echo "$makeopts"
+}
+
+# Select option for MAKEOPTS
+function sel_makeopts() {
+     if $GUM_CMD confirm "Would you like to specifiy your MAKEOPTS?"; then
+
+        MAKEOPTS=$($GUM_CMD input --width 120 \
+            --value "-j6 -l6" \
+            --prompt "👉 Input your MAKEOPTS: " | head -n 1)
+        if [[ -z "$MAKEOPTS" ]]; then
+            printf "\n❌ No valid block device was selected...\n\nTry again?\n\n"
+            return 1
+        else 
+            if ! gen_makeopts; then
+                exit 1
+            fi
+            return 1
+        fi
+    else
+        if ! gen_makeopts; then
+            exit 1
+        fi
+        return 1
+    fi
+}
+
+# Generate make.conf...
 function mk_conf() {
+
+    if ! sel_makeopts; then
+        exit 1
+    fi
 
     if ! gpu_check; then
         exit 1
@@ -126,7 +165,7 @@ FFLAGS="\${COMMON_FLAGS}"
 
 CPU_FLAGS_X86="${CPU_FLAGS}"
 
-MAKEOPTS="${MAKEOPTS}"
+MAKEOPTS="${MAKEOPTS_DEFAULT}"
 PORTAGE_NICENESS="1"
 
 EMERGE_DEFAULT_OPTS="--ask --tree --verbose ${EMERGE_OPTS} --with-bdeps y --complete-graph y"
@@ -140,10 +179,6 @@ INPUT_DEVICES="${KB_VAL}"
 
 PORTAGE_TMPDIR="/var/tmp/portage"
 PORTAGE_SCHEDULING_POLICY="idle"
-
-PORTDIR="/var/db/repos/gentoo"
-DISTDIR="/var/cache/binpkgs"
-PKGDIR="/var/cache/binpkgs"
 
 LC_MESSAGES="C"
 LANG="en_US.UTF-8"
@@ -236,21 +271,25 @@ function chroot() {
 
     clear
 
-    if ! mnt_subs; then
+    if ! gen_makeopts; then 
         exit 1
-    fi
+    fi 
 
-    if ! locale_gen; then
-        exit 1
-    fi
+    # if ! mnt_subs; then
+    #     exit 1
+    # fi
 
-    if ! portage; then
-        exit 1
-    fi
+    # if ! locale_gen; then
+    #     exit 1
+    # fi
+
+    # if ! portage; then
+    #     exit 1
+    # fi
     
-    if ! kernel; then
-        exit 1
-    fi
+    # if ! kernel; then
+    #     exit 1
+    # fi
 }
 
 chroot

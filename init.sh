@@ -158,7 +158,11 @@ function part_block() {
     BOOT_SIZE=$($GUM_CMD input --width 120 \
         --value 120 \
         --prompt "👉 Input the size in MB for your BOOT partition: " | head -n 1)
-
+    if [[ -z "$DEV_BLK" ]]; then
+        printf "\n❌ No valid block device was selected...\n\nTry again?\n\n"
+        return 1
+    fi
+    
     BOOT_SECTORS=$(($BOOT_SIZE * 1048576 / 512))
 
     SWAP_SIZE=$($GUM_CMD input --width 120 \
