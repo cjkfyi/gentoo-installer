@@ -39,11 +39,9 @@ EOF
 # Sync with git instead
 function git_sync() {
 
-    $GUM_CMD spin --spinner line --title "running \`emerge-webrsync\`..." -- \
-        emerge-webrsync 
+    $GUM_CMD spin --spinner line --title "running \`emerge-webrsync\`..." -- emerge-webrsync 
 
-    $GUM_CMD spin --spinner line --title "running \`emerge --sync\`..." -- \
-        emerge --sync
+    $GUM_CMD spin --spinner line --title "running \`emerge --sync\`..." -- emerge --sync
     
     $GUM_CMD spin --spinner line --title "running \`emerge dev-vcs/git app-eselect/eselect-repository\`..." -- \
         emerge dev-vcs/git app-eselect/eselect-repository
@@ -89,8 +87,8 @@ function cpu_flags() {
 
 function gpu_check() {
 
-    GPU_VAL=$($GUM_CMD choose --limit 1 --header "GPU?" "amd" "nvidia" "intel")
-    if [[ -z "$GPU_VAL" ]]; then
+    GPU=$($GUM_CMD choose --limit 1 --header "GPU?" "amd" "nvidia" "intel")
+    if [[ -z "$GPU" ]]; then
         printf "\n❌ No GPU was selected...\n\nTry again?\n\n"
         return 1
     fi
@@ -100,7 +98,7 @@ function gpu_check() {
 
 function kb_check() {
 
-    $GUM_CMD confirm "Are you on a laptop?" && KB_VAL="synaptics libinput" || KB_VAL="libinput"
+    $GUM_CMD confirm "Are you on a laptop?" && KB="synaptics libinput" || KB="libinput"
 
     return 0
 }
@@ -110,11 +108,11 @@ function gen_makeopts() {
     nproc_threads=$(nproc)
     ram_gb=$(grep MemTotal /proc/meminfo | awk '{print $2 / 1024}')
 
-    makeopts=$(echo "min($ram_gb/2, $nproc_threads)" | bc -l)
+    # makeopts=$(echo "min($ram_gb/2, $nproc_threads)" | bc -l)
 
     # makeopts="-j${nproc_threads} -l$(bc -l <<< "scale=0; ${nproc_threads} * 1.25")"
 
-    echo "$makeopts"
+    # echo "$makeopts"
 }
 
 # Select option for MAKEOPTS
@@ -174,8 +172,8 @@ FEATURES="candy fixlafiles unmerge-orphans parallel-fetch parallel-install"
 ACCEPT_LICENSE="*"
 ACCEPT_KEYWORDS="~amd64"
 GRUB_PLATFORMS="efi-64"
-VIDEO_CARDS="${GPU_VAL}"
-INPUT_DEVICES="${KB_VAL}"
+VIDEO_CARDS="${GPU}"
+INPUT_DEVICES="${KB}"
 
 PORTAGE_TMPDIR="/var/tmp/portage"
 PORTAGE_SCHEDULING_POLICY="idle"
@@ -271,25 +269,21 @@ function chroot() {
 
     clear
 
-    if ! gen_makeopts; then 
+    if ! mnt_subs; then
         exit 1
-    fi 
+    fi
 
-    # if ! mnt_subs; then
-    #     exit 1
-    # fi
+    if ! locale_gen; then
+        exit 1
+    fi
 
-    # if ! locale_gen; then
-    #     exit 1
-    # fi
-
-    # if ! portage; then
-    #     exit 1
-    # fi
+    if ! portage; then
+        exit 1
+    fi
     
-    # if ! kernel; then
-    #     exit 1
-    # fi
+    if ! kernel; then
+        exit 1
+    fi
 }
 
 chroot
