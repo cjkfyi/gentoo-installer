@@ -4,6 +4,8 @@
 # Initializing
 #
 
+GUM_CMD=gum
+
 # Install dependencies
 function get_deps() {
     if ! pacman -Qs jq > /dev/null; then
@@ -137,7 +139,9 @@ function sel_block() {
     if $GUM_CMD confirm "So, we're installing Gentoo on $BLK?"; then
         printf "\n⌛ Time to partition $BLK...\n\n"
     else
-        sel_block
+        if ! sel_block; then
+            exit 1
+        fi
     fi
 
     return 0
@@ -207,9 +211,87 @@ function fmt_parts() {
     printf "✅ ROOT was formatted to BTRFS!\n\n"
 }
 
-
 #
 # Preparing Base FS
+#
+
+function cp_scripts() {
+
+    cp chroot.sh ${MNT} > /dev/null 2>&1
+    cp ${GUM_BIN} ${MNT} > /dev/null 2>&1
+
+    printf "✅ Copied over required assets!\n\n"
+
+    return 0
+}
+
+#
+
+function ext_base() {
+
+    echo "$MNT"
+
+    $GUM_CMD spin --spinner line --title "Extracting the base fs..." -- \
+        tar xpvf ./assets/stage3-*.tar.xz -C "${MNT}" --xattrs-include='*.*' --numeric-owner 
+
+    printf "✅ Extracted the base fs!\n\n"
+
+    return 0
+}
+
+#
+
+function get_base() {
+
+    BASE_IDX_LOC=./assets/stage3.html
+
+    BASE_IDX_PARAMS=amd64/autobuilds/current-stage3-amd64-openrc
+    BASE_IDX_URL=https://mirrors.mit.edu/gentoo-distfiles/releases/${BASE_IDX_PARAMS}/
+
+    # Curl the latest version of the amd64 open
+    curl -L ${BASE_IDX_URL} -o ${BASE_IDX_LOC} > /dev/null 2>&1
+
+    IDX_FILE_NAME=$(grep -o '<a href="[^">]*"' ${BASE_IDX_LOC} | cut -d'"' -f2- | grep '.tar.xz"')
+    # Process the name of the latest file we're looking for...
+    BASE_FILE_NAME=${IDX_FILE_NAME%\"}
+    BASE_LOC=./assets/
+
+    NEW_BASE_FILE=./assets/${BASE_FILE_NAME}
+
+    BASE_FILE_URL=${BASE_IDX_URL}${BASE_FILE_NAME}
+
+    # Use glob pattern to match files starting with "stage3-"
+    OLD_BASE_LOC=$(find "./assets/" -maxdepth 1 -name stage3-*)
+    OLD_BASE_FILE=${OLD_BASE_LOC#./assets/}
+
+    # If we haven't ran this before...
+    if test -z "$OLD_BASE_LOC"; then
+
+        $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- curl -L ${BASE_FILE_URL} -o ${NEW_BASE_FILE}
+
+        printf "✅ Downloaded the latest stage3 tarball!\n\n"
+
+        return 0
+    fi
+
+    # Check if the last cached version matches:
+    if ! [ $OLD_BASE_FILE == $BASE_FILE_NAME ]; then
+
+        rm ${OLD_BASE_LOC}
+        
+        $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- curl -L ${BASE_FILE_URL} -o ${NEW_BASE_FILE}
+
+        printf "✅ Downloaded the latest stage3 tarball!\n\n"
+
+    else 
+
+        printf "✅ Reusing our latest stage3 tarball!\n\n"
+
+    fi
+
+    return 0
+}
+
 #
 
 function prep_base() {
@@ -227,32 +309,27 @@ function prep_base() {
 
     printf "✅ Sub-volumes were created!\n\n"
 
-    mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@ ${ROOT} ${MNT} > /dev/null 2>&1
+    BTR_ROOT_OPTS="defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@"
+    mount -t btrfs -o ${BTR_ROOT_OPTS} ${ROOT} ${MNT} > /dev/null 2>&1
 
     mkdir -p ${MNT}/boot/efi > /dev/null 2>&1
     mount ${BOOT} ${MNT}/boot/efi > /dev/null 2>&1
 
     swapon ${SWAP} > /dev/null 2>&1
 
-    #
+    if ! cp_scripts; then
+        exit 1
+    fi
 
-    cp chroot.sh ${MNT} > /dev/null 2>&1
-    cp ${GUM_BIN} ${MNT} > /dev/null 2>&1
+    if ! get_base; then
+        exit 1
+    fi
 
-    printf "✅ Copied over required assets!\n\n"
-
-    #
-
-    cd ${MNT} > /dev/null 2>&1
-
-    # TODO: Pull the latest version
-    wget https://distfiles.gentoo.org/releases/amd64/autobuilds/20240707T170407Z/stage3-amd64-openrc-20240707T170407Z.tar.xz > /dev/null 2>&1
+    if ! ext_base; then
+        exit 1
+    fi
     
-    printf "✅ Downloaded the latest stage3!\n\n"
-
-    tar xpvf stage3-*.tar.xz --xattrs-include='*.*' --numeric-owner > /dev/null 2>&1
-
-    printf "✅ Extracted the base fs into ${MNT}!\n\n"
+    cd ${MNT} > /dev/null 2>&1
 
     cp --dereference /etc/resolv.conf ${MNT}/etc/ > /dev/null 2>&1
 
