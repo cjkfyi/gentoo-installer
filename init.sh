@@ -83,12 +83,12 @@ function set_gum() {
     fi
 
     # With the file name, pre-establish the location for our gum binary.
-    gum_bin=./cache/gum_${LATEST_GUM}/gum
+    GUM_BIN=./cache/gum_${LATEST_GUM}/gum
 
     # Either reran or the first run...
     if [ $cached_ver == $LATEST_GUM ]; then
         # Check if we have the bin...
-        if ! test -f ${gum_bin}; then 
+        if ! test -f ${GUM_BIN}; then 
             printf "\n❌ \`gum\` wasn't found. Obtaining...\n\n"
             if ! get_gum; then
                 return 1
@@ -105,7 +105,7 @@ function set_gum() {
     fi
 
     # Set gum bin loc
-    GUM_CMD=${gum_bin}
+    GUM_CMD=${GUM_BIN}
 
     # 
     
@@ -369,6 +369,7 @@ function get_base() {
 
         printf "✅ Downloaded the latest stage3 tarball!\n\n"
 
+        # 
 
         return 0
     fi
@@ -405,43 +406,52 @@ function prep_base() {
 
     MNT=$"/mnt/gentoo"
 
+    # Make and mount the base sys.
     mkdir -p ${MNT} &> /dev/null
     mount ${ROOT} ${MNT} &> /dev/null
 
     # 
 
+    # Create the different sub-volumes desired. 
     btrfs subvolume create ${MNT}/@ &> /dev/null
     btrfs subvolume create ${MNT}/@home &> /dev/null
     btrfs subvolume create ${MNT}/@snapshots &> /dev/null
 
+    # Unmount, for the next step.
     umount -l ${MNT} &> /dev/null
 
     printf "✅ Sub-volumes were created!\n\n"
 
     # 
 
+    # Mount the root, `@` sub-volume.
     BTR_ROOT_OPTS="defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@"
     mount -t btrfs -o ${BTR_ROOT_OPTS} ${ROOT} ${MNT} &> /dev/null
 
     # 
 
+    # Make and mount the BOOT partition.
     mkdir -p ${MNT}/boot/efi &> /dev/null
     mount ${BOOT} ${MNT}/boot/efi &> /dev/null
 
     # 
 
+    # Enable the SWAP partition.
     swapon ${SWAP} &> /dev/null
 
     # 
 
+    # Copy essentials over.
     if ! cp_scripts; then
         return 1
     fi
 
+    # Gather Stage3 tarball.
     if ! get_base; then
         return 1
     fi
 
+    # Extract the base FS.
     if ! ext_base; then
         return 1
     fi
@@ -464,7 +474,7 @@ function prep_base() {
 }
 
 #
-#  Heart of it all
+#  Heart of this script
 # 
 
 function installer() {
