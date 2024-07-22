@@ -3,20 +3,28 @@
 GUM_CMD=./gum
 
 function init() {
-    printf "✅ Dropped into chroot!\n\n"
+
+    printf "✅ dropped into chroot\n\n"
+
     clear # the screen...
+
+    # 
+
     return 0
 }
 
-# Mounting sub-volumes
+# Mounting sub-volumes.
 function mnt_subs() {
 
     mkdir /.snapshots/ &> /dev/null
 
+    # Mount the `@home` and `@snapshots` sub-volumes.
     mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@snapshots /dev/nvme0n1p3 /.snapshots &> /dev/null
     mount -t btrfs -o defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@home /dev/nvme0n1p3 /home &> /dev/null
     
-    printf "✅ Mounted sub-volumes!\n\n"
+    printf "✅ mounted sub-volumes\n\n"
+
+    # 
 
     return 0
 }
@@ -30,7 +38,9 @@ en_US.UTF-8 UTF-8
 EOF
     locale-gen &> /dev/null
 
-    printf "✅ locale.gen was modified!\n\n"
+    printf "✅ locale.gen was modified\n\n"
+
+    # 
 
     return 0
 }
@@ -58,7 +68,9 @@ function git_sync() {
     $GUM_CMD spin --spinner line --title "running \`emaint sync\`..." -- \
         emaint sync
     
-    printf "✅ Now syncing portage with git!\n\n"
+    printf "✅ syncing portage with git\n\n"
+
+    # 
 
     return 0
 }
@@ -70,7 +82,6 @@ function cpu_flags() {
         emerge --oneshot app-portage/cpuid2cpuflags
 
     CPU_FLAGS=$(cpuid2cpuflags | cut -d: -f2-)
-
     EMERGE_OPTS="--jobs=12 --load-average=12"
 
     #
@@ -79,8 +90,9 @@ function cpu_flags() {
         emerge --oneshot resolve-march-native
 
     MARCH=$(resolve-march-native)
-
     COMMON_FLAGS="${MARCH} -O2 -pipe"
+
+    # 
 
     return 0
 }
@@ -94,6 +106,21 @@ function gpu_check() {
         printf "\n❌ No GPU was selected...\n\nTry again?\n\n"
         return 1
     fi
+
+    return 0
+}
+
+function cpu_check() {
+
+    local vendor=$(uname --hardware-platform)
+
+    if [[ "$cpu_vendor" == "GenuineIntel" ]]; then
+        CPU="intel"
+    if else [[ "$cpu_vendor" == "authenticAMD" ]]
+        CPU="amd"
+    fi
+
+    printf "$CPU CPU!"
 
     return 0
 }
@@ -143,6 +170,10 @@ function sel_makeopts() {
 function mk_conf() {
 
     if ! sel_makeopts; then
+        exit 1
+    fi
+
+    if ! cpu_check; then
         exit 1
     fi
 

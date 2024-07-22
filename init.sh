@@ -8,9 +8,9 @@ function get_deps() {
     if command -v pacman &> /dev/null; then
         # Check if we have jq installed...
         if ! pacman -Qs jq &> /dev/null; then
-            printf "\n📦 Installing the pkg \`jq\`...\n"
+            printf "\n📦 installing the pkg \`jq\`...\n"
             pacman -Sy --noconfirm jq  &> /dev/null
-            printf "\n✅ Successfully installed \`jq\`!\n"
+            printf "\n✅ successfully installed \`jq\`\n"
         fi
     fi
 
@@ -89,7 +89,6 @@ function set_gum() {
     if [ $cached_ver == $LATEST_GUM ]; then
         # Check if we have the bin...
         if ! test -f ${GUM_BIN}; then 
-            printf "\n❌ \`gum\` wasn't found. Obtaining...\n\n"
             if ! get_gum; then
                 return 1
             fi
@@ -166,7 +165,7 @@ function sel_block() {
     # Confirm whether or not the selected block is correct.
     if $GUM_CMD confirm "So, we're installing Gentoo on $BLK_LOC?"; then
         # If a selection was made, go ahead and continue.
-        printf "\n⌛ Time to partition $BLK_LOC...\n\n"
+        printf "\n⌛ time to partition $BLK_LOC...\n\n"
     else # Rerun the selection...
         if ! sel_block; then
             return 1
@@ -275,21 +274,21 @@ function fmt_parts() {
     # Format the BOOT partition.
     mkfs.vfat -F 32 ${BOOT} &> /dev/null
 
-    printf "✅ BOOT was formatted to Fat32!\n\n"
+    printf "✅ BOOT was formatted to Fat32\n\n"
 
     # 
 
     # Format the SWAP partition.
     mkswap ${SWAP} &> /dev/null
 
-    printf "✅ SWAP was made!\n\n"
+    printf "✅ SWAP was made\n\n"
 
     # 
 
     # Format the ROOT partition.
     mkfs.btrfs -f ${ROOT} &> /dev/null
 
-    printf "✅ ROOT was formatted to BTRFS!\n\n"
+    printf "✅ ROOT was formatted to BTRFS\n\n"
 
     # 
 
@@ -309,7 +308,7 @@ function cp_scripts() {
     # Copy over the currently generated `resolv.conf` file.
     cp --dereference /etc/resolv.conf ${MNT}/etc/ &> /dev/null
 
-    printf "✅ Copied over the required assets!\n\n"
+    printf "✅ copied over the required assets\n\n"
 
     # 
 
@@ -323,7 +322,7 @@ function ext_base() {
     $GUM_CMD spin --spinner line --title "Extracting the base fs..." -- \
         tar xpvf ./cache/stage3-*.tar.xz -C "${MNT}" --xattrs-include='*.*' --numeric-owner 
 
-    printf "✅ Extracted the stage3 into ${MNT}!\n\n"
+    printf "✅ extracted the stage3 into ${MNT}\n\n"
 
     # 
 
@@ -367,7 +366,7 @@ function get_base() {
         $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- \
             curl -L ${full_url} -o ${base_loc}
 
-        printf "✅ Downloaded the latest stage3 tarball!\n\n"
+        printf "✅ downloaded the latest stage3 tarball\n\n"
 
         # 
 
@@ -386,14 +385,14 @@ function get_base() {
         $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- \
             curl -L ${full_url} -o ${base_loc}
 
-        printf "✅ Downloaded the latest stage3 tarball!\n\n"
+        printf "✅ downloaded the latest stage3 tarball\n\n"
 
         #
 
         return 0
     fi
 
-    printf "✅ Reusing our latest stage3 tarball!\n\n"
+    printf "✅ reusing our latest stage3 tarball\n\n"
 
     # 
 
@@ -420,7 +419,7 @@ function prep_base() {
     # Unmount, for the next step.
     umount -l ${MNT} &> /dev/null
 
-    printf "✅ Sub-volumes were created!\n\n"
+    printf "✅ sub-volumes were created\n\n"
 
     # 
 
