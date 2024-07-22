@@ -1,124 +1,145 @@
 #!/bin/bash
 
-#
-# Initializing
-#
-
 GUM_CMD=gum
 
-# Install dependencies
+# Install dependencies...
 function get_deps() {
-    if ! pacman -Qs jq > /dev/null; then
-        printf "\n📦 Installing the pkg \`jq\`...\n"
-        pacman -Sy --noconfirm jq  > /dev/null
-        printf "\n✅ Successfully installed \`jq\`!\n"
-    fi
-    if ! pacman -Qs curl > /dev/null; then
-        printf "\n📦 Installing the pkg \`curl\`...\n"
-        pacman -Sy --noconfirm curl > /dev/null
-        printf "\n✅ Successfully installed \`curl\`!\n"
+    # Check if we're using an Arch-based distro:
+    if command -v pacman &> /dev/null; then
+        # Check if we have jq installed...
+        if ! pacman -Qs jq &> /dev/null; then
+            printf "\n📦 Installing the pkg \`jq\`...\n"
+            pacman -Sy --noconfirm jq  &> /dev/null
+            printf "\n✅ Successfully installed \`jq\`!\n"
+        fi
     fi
 
-    return 0
+    # 
+
+    # Ensure `gum` is present...
+    if ! set_gum; then
+        exit 1
+    fi
+
+    # 
+    
+    return 0 
 }
 
-# Fetch gum bin
+# Fetch gum bin...
 function get_gum() {
-    GUM_FILE_NAME=$(jq -r '.[0].assets[] | select(.name | test("gum_.*_Linux_x86_64.tar.gz")) .name' ${GUM_CACHED_FILE} | 
+
+    # Capture the file name, of the latest version found. It will be named exactly as it was uploaded.
+    local file_name=$(jq -r '.[0].assets[] | select(.name | test("gum_.*_Linux_x86_64.tar.gz")) .name' ${CACHED_GUM} | 
         head -n 1)
-    GUM_URL=$(jq -r '.[0].assets[] | select(.name | test("gum_.*_Linux_x86_64.tar.gz")) .browser_download_url' ${GUM_CACHED_FILE} | 
+    # Capture the url to download the latest version of the pre-built gum binary.
+    local dl_url=$(jq -r '.[0].assets[] | select(.name | test("gum_.*_Linux_x86_64.tar.gz")) .browser_download_url' ${CACHED_GUM} | 
         head -n 1)
+    
+    # File & extracted directory name.
+    local ext_dir=${file_name%.tar.gz}
+    # Simplify the directory name:
+    local new_dir=./cache/gum_${LATEST_GUM}
 
-    OLD_GUM_DIR=${GUM_FILE_NAME%.tar.gz}
-    NEW_GUM_DIR=./assets/gum_${GUM_LATEST}
+    # Ensure the new dir is created.
+    mkdir -p $new_dir &> /dev/null
 
-    mkdir $NEW_GUM_DIR > /dev/null 2>&1
+    # 
 
-    curl -L ${GUM_URL} -o ./assets/${GUM_FILE_NAME} > /dev/null 2>&1
-    tar -xf ./assets/${GUM_FILE_NAME} -C ./assets/ > /dev/null 2>&1
-    mv ./assets/${OLD_GUM_DIR}/gum $NEW_GUM_DIR > /dev/null 2>&1
-    rm -rf ./assets/${OLD_GUM_DIR} > /dev/null 2>&1
-    rm ./assets/${GUM_FILE_NAME} > /dev/null 2>&1
+    # Download the latest pre-built gum binary, named as it was uploaded.
+    curl -L ${dl_url} -o ./cache/${file_name} &> /dev/null
+    # Extract the downloaded tarball as a directory.
+    tar -xf ./cache/${file_name} -C ./cache/ &> /dev/null
+    # Copy the bin into the newly created directory.
+    mv ./cache/${ext_dir}/gum $new_dir &> /dev/null
+    # Remove whatever resides, afterwards.
+    rm -rf ./cache/${ext_dir} &> /dev/null
+    rm ./cache/${file_name} &> /dev/null
 
-    return 0
+    # 
+
+    return 0 
 }
 
-# Establish bin location
+# Establish bin loc...
 function set_gum() {
 
-    REPO_URL=https://api.github.com/repos/charmbracelet/gum/releases
-    GUM_CACHED_FILE=./assets/gum_releases.json
+    local gum_url="https://api.github.com/repos/charmbracelet/gum/releases"
+    CACHED_GUM="./cache/gum_releases.json"
 
-    # Check if we've ran this once before
-    if ! test -f "$GUM_CACHED_FILE"; then
-        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE}
-        GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
-        GUM_LATEST=${GUM_CACHED_VER}
+    # Check if it's the first run:
+    if ! test -f "$CACHED_GUM"; then
+        # It is? Download a page that lists the latest releases.
+        curl -sS ${gum_url} > ${CACHED_GUM}
+        # Capture the name of the latest version.
+        local cached_ver=$(jq -r '.[] | .name' ${CACHED_GUM} | head -n 1)
+        # Since we've just downloaded the file...
+        LATEST_GUM=${cached_ver}
     else 
-        GUM_CACHED_VER=$(jq -r '.[] | .name' ${GUM_CACHED_FILE} | head -n 1)
-        GUM_LATEST=$(curl -sS ${REPO_URL} | jq -r '.[] | .name' | head -n 1)
+        # Capture the name of the version that was cached.
+        local cached_ver=$(jq -r '.[] | .name' ${CACHED_GUM} | head -n 1)
+        # Check if that matches the latest version found.
+        latest_ver=$(curl -sS ${gum_url} | jq -r '.[] | .name' | head -n 1)
     fi
 
-    GUM_BIN=./assets/gum_${GUM_LATEST}/gum
+    # With the file name, pre-establish the location for our gum binary.
+    gum_bin=./cache/gum_${LATEST_GUM}/gum
 
-    # Check if the last cached version matches:
-    if [ $GUM_CACHED_VER == $GUM_LATEST ]; then
+    # Either reran or the first run...
+    if [ $cached_ver == $LATEST_GUM ]; then
         # Check if we have the bin...
-        if ! test -f ${GUM_BIN}; then 
+        if ! test -f ${gum_bin}; then 
             printf "\n❌ \`gum\` wasn't found. Obtaining...\n\n"
             if ! get_gum; then
-                exit 1
+                return 1
             fi
         fi
     else
         # Versioning difference detected, rm and update...
         printf "\n👀 New \`gum\` release detected. Updating...\n\n"
-        rm -rf ./assets/gum_${GUM_CACHED_VER} > /dev/null 2>&1
-        curl -sS ${REPO_URL} > ${GUM_CACHED_FILE} > /dev/null 2>&1
+        rm -rf ./cache/gum_${cached_ver} > /dev/null 2>&1
+        curl -sS ${repo_url} > ${CACHED_GUM} > /dev/null 2>&1
         if ! get_gum; then
-            exit 1
+            return 1
         fi
     fi
 
     # Set gum bin loc
-    GUM_CMD=${GUM_BIN}
+    GUM_CMD=${gum_bin}
+
+    # 
     
-    return 0
+    return 0 
 }
 
 # Initialization
 function init() {
 
-    clear
+    clear # the screen...
 
     # Ensure privs are met...
     if [ $(id -u) != 0 ]; then
         printf "\n❌ Script not ran as root. Exiting.\n\n"
-        exit 1
+        return 1
     fi
 
     # Ensure a valid network connection...
     if ! ping -c 1 -w 2 google.com &> /dev/null; then
         printf "\n❌ No internet connection. Exiting.\n\n"
-        exit 1
+        return 1
     fi
 
     # Ensure this dir exists...
-    mkdir -p ./assets
+    mkdir -p ./cache
 
     # Ensure dependencies are installed...
-    if command -v pacman &> /dev/null; then
-        if ! get_deps; then
-            exit 1
-        fi
+    if ! get_deps; then
+        return 1
     fi
+
+    # 
     
-    # Ensure `gum` is present...
-    if ! set_gum; then
-        exit 1
-    fi
-    
-    return 0
+    return 0 
 }
 
 #
@@ -127,53 +148,90 @@ function init() {
 
 function sel_block() {
 
-    clear
+    clear # the screen...
 
-    local disks=$(lsblk -d -n -oNAME,RO | grep '0$' | awk {'print $1'})
-    DEV_BLK=$($GUM_CMD choose --limit 1 --header "Device block to partition:" <<< "$disks")
-    if [[ -z "$DEV_BLK" ]]; then
-        printf "\n❌ No valid block device was selected...\n\nTry again?\n\n"
+    # List the different blocks found connected to the system.
+    local blks=$(lsblk -d -n -oNAME,RO | grep '0$' | awk {'print $1'})
+    # Choose one block from the list, to install Gentoo Linux on.
+    local block=$($GUM_CMD choose --limit 1 --header "Device block to partition:" <<< "$blks")
+    if [[ -z "$block" ]]; then
+        # Probably interrupted...
+        printf "\n❌ No valid block device was selected?\n\nTry again?\n\n"
         return 1
     fi
 
-    BLK=$"/dev/$DEV_BLK"
+    # Location for the block device.
+    BLK_LOC=$"/dev/$block"
 
-    if $GUM_CMD confirm "So, we're installing Gentoo on $BLK?"; then
-        printf "\n⌛ Time to partition $BLK...\n\n"
-    else
+    # Confirm whether or not the selected block is correct.
+    if $GUM_CMD confirm "So, we're installing Gentoo on $BLK_LOC?"; then
+        # If a selection was made, go ahead and continue.
+        printf "\n⌛ Time to partition $BLK_LOC...\n\n"
+    else # Rerun the selection...
         if ! sel_block; then
-            exit 1
+            return 1
         fi
     fi
 
-    return 0
+    # 
+
+    return 0 
 }
 
 #
 # Partitioning
 #
 
-function part_block() {
+function sel_boot_size() {
 
+    # Input the size, or an error throws...
     BOOT_SIZE=$($GUM_CMD input --width 120 \
         --value 120 \
-        --prompt "👉 Input the size in MB for your BOOT partition: " | head -n 1)
-    if [[ -z "$DEV_BLK" ]]; then
-        printf "\n❌ No valid block device was selected...\n\nTry again?\n\n"
+        --prompt "👉 Input the size (in MB), for your BOOT partition: " | head -n 1)
+    if [[ -z "$BOOT_SIZE" ]]; then
+        printf "\n❌ x...\n\n"
         return 1
     fi
-    
-    BOOT_SECTORS=$(($BOOT_SIZE * 1048576 / 512))
 
+    # 
+    
+    return 0 
+}
+
+function sel_swap_size() {
+
+    # Input the size, or an error throws...
     SWAP_SIZE=$($GUM_CMD input --width 120 \
         --value 32000 \
-        --prompt "👉 Input the size in MB for your SWAP partition: " | head -n 1)
+        --prompt "👉 Input the size (in MB), for your SWAP partition: " | head -n 1)
+    if [[ -z "$SWAP_SIZE" ]]; then
+        printf "\n❌ x...\n\n"
+        return 1
+    fi
 
-    SWAP_SECTORS=$(($SWAP_SIZE * 1048576 / 512))
+    # 
+    
+    return 0 
+}
 
-    BOTH_SECTORS=$(($BOOT_SECTORS + $SWAP_SECTORS + 4098))
+function part_block() {
 
-    sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${BLK} > /dev/null 2>&1
+    # Obtain the `BOOT_SIZE`
+    if ! sel_boot_size; then
+        return 1
+    fi
+
+    # Obtain the `SWAP_SIZE`
+    if ! sel_swap_size; then
+        return 1
+    fi
+
+    # Calculate the correct sectors
+    local boot_sec=$(($BOOT_SIZE * 1048576 / 512))
+    local swap_sec=$(($SWAP_SIZE * 1048576 / 512))
+    local root_sec=$(($boot_sec + $swap_sec + 4098))
+
+    sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${BLK_LOC} &> /dev/null
       g # new GPT
       n # new partition
       1 # default partition 1
@@ -188,14 +246,16 @@ function part_block() {
       19 # swap type
       n # new partition
       3 # partion number 3
-      $BOTH_SECTORS
+      $root_sec
         # default, extend partition to end of disk
       w # write the partition table
 EOF
 
     printf "✅ BOOT, SWAP & ROOT partitions were created!\n\n"
 
-    return 0
+    # 
+
+    return 0 
 }
 
 #
@@ -203,20 +263,37 @@ EOF
 #
 
 function fmt_parts() {
-    BOOT=$(printf "%sp1" "$BLK")
-    SWAP=$(printf "%sp2" "$BLK")
-    ROOT=$(printf "%sp3" "$BLK")
 
-    mkfs.vfat -F 32 ${BOOT} > /dev/null 2>&1
+    # TODO: Handle in sel_block()
+    # Dynamically (diff disk types)
+    BOOT=$(printf "%sp1" "$BLK_LOC")
+    SWAP=$(printf "%sp2" "$BLK_LOC")
+    ROOT=$(printf "%sp3" "$BLK_LOC")
+
+    # 
+
+    # Format the BOOT partition.
+    mkfs.vfat -F 32 ${BOOT} &> /dev/null
+
     printf "✅ BOOT was formatted to Fat32!\n\n"
 
-    mkswap ${SWAP} > /dev/null 2>&1
+    # 
+
+    # Format the SWAP partition.
+    mkswap ${SWAP} &> /dev/null
+
     printf "✅ SWAP was made!\n\n"
 
-    mkfs.btrfs -f ${ROOT} > /dev/null 2>&1
+    # 
+
+    # Format the ROOT partition.
+    mkfs.btrfs -f ${ROOT} &> /dev/null
+
     printf "✅ ROOT was formatted to BTRFS!\n\n"
 
-    return 0
+    # 
+
+    return 0 
 }
 
 #
@@ -224,13 +301,19 @@ function fmt_parts() {
 #
 
 function cp_scripts() {
+    
+    # Copy over the chroot script + gum bin to ROOT.
+    cp ./chroot.sh ${MNT} &> /dev/null
+    cp ${GUM_BIN} ${MNT} &> /dev/null
 
-    cp chroot.sh ${MNT} > /dev/null 2>&1
-    cp ${GUM_BIN} ${MNT} > /dev/null 2>&1
+    # Copy over the currently generated `resolv.conf` file.
+    cp --dereference /etc/resolv.conf ${MNT}/etc/ &> /dev/null
 
-    printf "✅ Copied over required assets!\n\n"
+    printf "✅ Copied over the required assets!\n\n"
 
-    return 0
+    # 
+
+    return 0 
 }
 
 #
@@ -238,62 +321,82 @@ function cp_scripts() {
 function ext_base() {
 
     $GUM_CMD spin --spinner line --title "Extracting the base fs..." -- \
-        tar xpvf ./assets/stage3-*.tar.xz -C "${MNT}" --xattrs-include='*.*' --numeric-owner 
+        tar xpvf ./cache/stage3-*.tar.xz -C "${MNT}" --xattrs-include='*.*' --numeric-owner 
 
-    printf "✅ Extracted the base fs!\n\n"
+    printf "✅ Extracted the stage3 into ${MNT}!\n\n"
 
-    return 0
+    # 
+
+    return 0 
 }
 
-#
+# 
 
 function get_base() {
 
-    BASE_IDX_LOC=./assets/stage3.html
+    # Define the cached index page.
+    local cached="./cache/stage3.html"
+    
+    # Construct the mirror where we'll retrieve the tarball.
+    local params="amd64/autobuilds/current-stage3-amd64-openrc"
+    local url="https://mirrors.mit.edu/gentoo-distfiles/releases/${params}/"
 
-    BASE_IDX_PARAMS=amd64/autobuilds/current-stage3-amd64-openrc
-    BASE_IDX_URL=https://mirrors.mit.edu/gentoo-distfiles/releases/${BASE_IDX_PARAMS}/
+    # Curl the index page for the latest Stage3.
+    curl -L ${url} -o ${cached} > /dev/null 2>&1
 
-    # Curl the latest version of the amd64 open
-    curl -L ${BASE_IDX_URL} -o ${BASE_IDX_LOC} > /dev/null 2>&1
+    # 
 
-    IDX_FILE_NAME=$(grep -o '<a href="[^">]*"' ${BASE_IDX_LOC} | cut -d'"' -f2- | grep '.tar.xz"')
+    # Capture most of the file name from the index gathered.
+    local idx_name=$(grep -o '<a href="[^">]*"' ${cached} | cut -d'"' -f2- | grep '.tar.xz"')
     # Process the name of the latest file we're looking for...
-    BASE_FILE_NAME=${IDX_FILE_NAME%\"}
-    BASE_LOC=./assets/
+    local base_name=${idx_name%\"}
 
-    NEW_BASE_FILE=./assets/${BASE_FILE_NAME}
-
-    BASE_FILE_URL=${BASE_IDX_URL}${BASE_FILE_NAME}
+    local base_loc="./cache/${base_name}"
+    local full_url=${url}${base_name}
 
     # Use glob pattern to match files starting with "stage3-"
-    OLD_BASE_LOC=$(find "./assets/" -maxdepth 1 -name stage3-*)
-    OLD_BASE_FILE=${OLD_BASE_LOC#./assets/}
+    local old_loc=$(find "./cache/" -maxdepth 1 -name stage3-*)
+    local old_file=${old_loc#./cache/}
+
+    # 
 
     # If we haven't ran this before...
-    if test -z "$OLD_BASE_LOC"; then
+    if test -z "$old_loc"; then
 
+        # Curl the latest Gentoo AMD64 OpenRC Stage3 tarball.
         $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- \
-            curl -L ${BASE_FILE_URL} -o ${NEW_BASE_FILE}
+            curl -L ${full_url} -o ${base_loc}
 
         printf "✅ Downloaded the latest stage3 tarball!\n\n"
+
 
         return 0
     fi
 
-    # Check if the last cached version matches:
-    if ! [ $OLD_BASE_FILE == $BASE_FILE_NAME ]; then
+    # 
 
-        rm ${OLD_BASE_LOC}
-        
+    # Check if the last cached version matches:
+    if ! [ $old_file == $base_name ]; then
+
+        # Rm old file.
+        rm ${old_loc}
+
+        # Curl the latest Gentoo AMD64 OpenRC Stage3 tarball.
         $GUM_CMD spin --spinner line --title "Downloading the base fs..." -- \
-            curl -L ${BASE_FILE_URL} -o ${NEW_BASE_FILE}
+            curl -L ${full_url} -o ${base_loc}
+
         printf "✅ Downloaded the latest stage3 tarball!\n\n"
-    else 
-        printf "✅ Reusing our latest stage3 tarball!\n\n"
+
+        #
+
+        return 0
     fi
 
-    return 0
+    printf "✅ Reusing our latest stage3 tarball!\n\n"
+
+    # 
+
+    return 0 
 }
 
 #
@@ -302,81 +405,91 @@ function prep_base() {
 
     MNT=$"/mnt/gentoo"
 
-    mkdir --parents ${MNT} > /dev/null 2>&1
-    mount ${ROOT} ${MNT} > /dev/null 2>&1
+    mkdir -p ${MNT} &> /dev/null
+    mount ${ROOT} ${MNT} &> /dev/null
 
-    btrfs subvolume create ${MNT}/@ > /dev/null 2>&1
-    btrfs subvolume create ${MNT}/@home > /dev/null 2>&1
-    btrfs subvolume create ${MNT}/@snapshots > /dev/null 2>&1
+    # 
 
-    umount -l ${MNT} > /dev/null 2>&1
+    btrfs subvolume create ${MNT}/@ &> /dev/null
+    btrfs subvolume create ${MNT}/@home &> /dev/null
+    btrfs subvolume create ${MNT}/@snapshots &> /dev/null
+
+    umount -l ${MNT} &> /dev/null
 
     printf "✅ Sub-volumes were created!\n\n"
 
+    # 
+
     BTR_ROOT_OPTS="defaults,noatime,compress=zstd,commit=120,autodefrag,ssd,space_cache=v2,subvol=@"
-    mount -t btrfs -o ${BTR_ROOT_OPTS} ${ROOT} ${MNT} > /dev/null 2>&1
+    mount -t btrfs -o ${BTR_ROOT_OPTS} ${ROOT} ${MNT} &> /dev/null
 
-    mkdir -p ${MNT}/boot/efi > /dev/null 2>&1
-    mount ${BOOT} ${MNT}/boot/efi > /dev/null 2>&1
+    # 
 
-    swapon ${SWAP} > /dev/null 2>&1
+    mkdir -p ${MNT}/boot/efi &> /dev/null
+    mount ${BOOT} ${MNT}/boot/efi &> /dev/null
+
+    # 
+
+    swapon ${SWAP} &> /dev/null
+
+    # 
 
     if ! cp_scripts; then
-        exit 1
+        return 1
     fi
 
     if ! get_base; then
-        exit 1
+        return 1
     fi
 
     if ! ext_base; then
-        exit 1
+        return 1
     fi
     
-    cd ${MNT} > /dev/null 2>&1
+    # 
 
-    cp --dereference /etc/resolv.conf ${MNT}/etc/ > /dev/null 2>&1
-
-    mount --types proc /proc ${MNT}/proc > /dev/null 2>&1
-    mount --rbind /sys ${MNT}/sys > /dev/null 2>&1
-    mount --make-rslave ${MNT}/sys > /dev/null 2>&1
-    mount --rbind /dev ${MNT}/dev > /dev/null 2>&1
-    mount --make-rslave ${MNT}/dev > /dev/null 2>&1
-    mount --bind /run ${MNT}/run > /dev/null 2>&1
-    mount --make-slave ${MNT}/run> /dev/null 2>&1 
-
-    printf "✅ Extracted the base fs into ${MNT}!\n\n"
-
+    mount --types proc /proc ${MNT}/proc &> /dev/null
+    mount --rbind /sys ${MNT}/sys &> /dev/null
+    mount --make-rslave ${MNT}/sys &> /dev/null
+    mount --rbind /dev ${MNT}/dev &> /dev/null
+    mount --make-rslave ${MNT}/dev &> /dev/null
+    mount --bind /run ${MNT}/run &> /dev/null
+    mount --make-slave ${MNT}/run &> /dev/null
+    
     chroot ${MNT} /bin/bash -c "./chroot.sh" 
 
-    return 0
+    # 
+
+    return 0 
 }
 
 #
 #  Heart of it all
-#
+# 
 
 function installer() {
 
     if ! init; then
-        exit 1
+        return 1
     fi
 
     if ! sel_block; then
-        exit 1
+        return 1
     fi
 
     if ! part_block; then
-        exit 1
+        return 1
     fi
 
     if ! fmt_parts; then
-        exit 1
+        return 1
     fi
 
     if ! prep_base; then
-        exit 1
+        return 1
     fi
 }
 
-installer
+if ! installer; then
+    exit 1
+fi
