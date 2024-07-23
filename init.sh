@@ -181,12 +181,13 @@ function sel_block() {
 # Partitioning
 #
 
-function sel_boot_size() {
+function input_boot_size() {
 
-    # Input the size, or an error throws...
+    # Input the size, or throw an error...
     BOOT_SIZE=$($GUM_CMD input --width 120 \
         --value 120 \
         --prompt "👉 Input the size (in MB), for your BOOT partition: " | head -n 1)
+
     if [[ -z "$BOOT_SIZE" ]]; then
         printf "\n❌ x...\n\n"
         return 1
@@ -197,12 +198,13 @@ function sel_boot_size() {
     return 0 
 }
 
-function sel_swap_size() {
+function input_swap_size() {
 
-    # Input the size, or an error throws...
+    # Input the size, or throw an error...
     SWAP_SIZE=$($GUM_CMD input --width 120 \
         --value 32000 \
         --prompt "👉 Input the size (in MB), for your SWAP partition: " | head -n 1)
+
     if [[ -z "$SWAP_SIZE" ]]; then
         printf "\n❌ x...\n\n"
         return 1
@@ -216,12 +218,12 @@ function sel_swap_size() {
 function part_block() {
 
     # Obtain the `BOOT_SIZE`
-    if ! sel_boot_size; then
+    if ! input_boot_size; then
         return 1
     fi
 
     # Obtain the `SWAP_SIZE`
-    if ! sel_swap_size; then
+    if ! input_swap_size; then
         return 1
     fi
 
@@ -235,16 +237,16 @@ function part_block() {
       n # new partition
       1 # default partition 1
         # default - start at beginning of disk
-      +${BOOT_SIZE}M # MB BOOT parttion
+      +${BOOT_SIZE}M # MB BOOT partition
       n # new partition
-      2 # default partion 2
+      2 # default partition 2
         # default, start immediately after preceding partition
-      +${SWAP_SIZE}M # MB SWAP parttion
+      +${SWAP_SIZE}M # MB SWAP partition
       t # set type
       2 # of part 2
       19 # swap type
       n # new partition
-      3 # partion number 3
+      3 # partition number 3
       $root_sec
         # default, extend partition to end of disk
       w # write the partition table
@@ -457,6 +459,7 @@ function prep_base() {
     
     # 
 
+    # Mounting all of the necessary filesystems.
     mount --types proc /proc ${MNT}/proc &> /dev/null
     mount --rbind /sys ${MNT}/sys &> /dev/null
     mount --make-rslave ${MNT}/sys &> /dev/null
@@ -470,6 +473,41 @@ function prep_base() {
     # 
 
     return 0 
+}
+
+# 
+
+function gen_fstab() {
+
+    local url="https://raw.githubusercontent.com/glacion/genfstab/master/genfstab"
+
+    curl -o cache/genfstab $url
+
+    cd cache 
+
+    chmod -x genfstab
+
+    ./genfstab "${MNT}" > "${MNT}"/etc/fstab
+
+    printf "✅ fstab was generated\n\n"
+
+    cd ../
+
+    # 
+
+    return 0
+}
+
+# 
+
+function clean_up() {
+
+    umount -l /mnt/gentoo/dev
+    umount -R /mnt/gentoo
+
+    # 
+
+    return 0
 }
 
 #
@@ -497,8 +535,18 @@ function installer() {
     if ! prep_base; then
         return 1
     fi
+
+    if ! gen_fstab; then
+        return 1
+    fi
+
+    if ! clean_up; then
+        return 1
+    fi
 }
 
 if ! installer; then
     exit 1
 fi
+
+return 0
