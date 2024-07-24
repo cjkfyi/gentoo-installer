@@ -481,12 +481,10 @@ function gen_fstab() {
 
     local url="https://raw.githubusercontent.com/glacion/genfstab/master/genfstab"
 
-    curl -o cache/genfstab $url
+    curl -o cache/genfstab $url &> /dev/null
 
-    cd cache 
-
-    chmod -x genfstab
-
+    cd cache &> /dev/null
+    chmod -x genfstab &> /dev/null
     ./genfstab "${MNT}" > "${MNT}"/etc/fstab
 
     printf "✅ fstab was generated\n\n"

@@ -4,9 +4,9 @@ GUM_CMD=./gum
 
 function init() {
 
-    printf "✅ dropped into chroot\n\n"
-
     clear # the screen...
+
+    printf "\n✅ dropped into chroot\n\n"
 
     # 
 
@@ -147,7 +147,9 @@ EOF
 
     eselect locale set en_US.utf8 &> /dev/null
 
-    env-update && source /etc/profile
+    env-update &> /dev/null
+
+    source /etc/profile &> /dev/null
 
     printf "✅ locale has been set\n\n"
 
@@ -163,9 +165,9 @@ EOF
 # Sync with git instead
 function git_sync() {
 
-    # $GUM_CMD spin --spinner line --title "Running \`emerge-webrsync\`..." -- emerge-webrsync 
+    $GUM_CMD spin --spinner line --title "Running \`emerge-webrsync\`..." -- emerge-webrsync 
 
-    # $GUM_CMD spin --spinner line --title "Running \`emerge --sync\`..." -- emerge --sync
+    $GUM_CMD spin --spinner line --title "Running \`emerge --sync\`..." -- emerge --sync
 
     # 
     
@@ -233,8 +235,8 @@ function cpu_flags() {
 
     COMMON_FLAGS="${MARCH} -O2 -pipe"
 
+    # 
     
-
     return 0
 }
 
