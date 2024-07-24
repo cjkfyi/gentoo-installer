@@ -112,7 +112,7 @@ function set_tz() {
 
     # Input tz, or throw an error...
     TZ=$($GUM_CMD input --width 120 \
-        --value "Country/City" \
+        --placeholder "Country/City" \
         --prompt "👉 Input your timezone: " | head -n 1)
         
     if [[ -z "$TZ" ]]; then
@@ -163,15 +163,16 @@ EOF
 # Sync with git instead
 function git_sync() {
 
-    $GUM_CMD spin --spinner line --title "Running \`emerge-webrsync\`..." -- emerge-webrsync 
+    # $GUM_CMD spin --spinner line --title "Running \`emerge-webrsync\`..." -- emerge-webrsync 
 
-    $GUM_CMD spin --spinner line --title "Running \`emerge --sync\`..." -- emerge --sync
+    # $GUM_CMD spin --spinner line --title "Running \`emerge --sync\`..." -- emerge --sync
 
     # 
     
-    $GUM_CMD spin --spinner line --title "Emerging \`dev-vcs/git\` + \`app-eselect/eselect-repository\`..." -- \
+    $GUM_CMD spin --spinner line --title "Emerging \`git\` & \`eselect-repository\`..." -- \
         emerge dev-vcs/git app-eselect/eselect-repository
 
+    eselect repository disable gentoo &> /dev/null
     eselect repository enable gentoo &> /dev/null
     eselect repository enable guru &> /dev/null
 
@@ -192,22 +193,23 @@ function git_sync() {
 function cpu_flags() {
 
     # Determine which CPU we're rockin.
-    cpu_vendor=$(uname --hardware-platform)
-    local vendor=$cpu_vendor
-
-    declare -A choices
-    choices=( [GenuineIntel]="intel" [authenticAMD]="amd" )
-
-    if [[ -n ${choices[$vendor]} ]]; then
-        # Either `intel` or `amd`.
-        CPU=${choices[$vendor]}
-    else 
-        return 1
+    local vendor=$(cat /proc/cpuinfo | 
+        (read -r _ && read id && echo "$id" | awk -F': ' '{print $2}'))
+    
+    if [ "$vendor" == "GenuineIntel" ] || [ "$vendor" == "AuthenticAMD" ]; then
+      if [ "$vendor" == "GenuineIntel" ]; then
+        CPU="intel"
+      elif [ "$vendor" == "AuthenticAMD" ]; then
+        CPU="amd"
+      fi
+    else
+      echo "Err processing the vendor of the CPU..."
+      return 1
     fi
 
     # 
 
-    if [[ $CPU == "intel"]]; then
+    if [[ $CPU == "intel" ]]; then
 
         $GUM_CMD spin --spinner line --title "Emerging \`sys-firmware/intel-microcode\`..." -- \
             emerge sys-firmware/intel-microcode
@@ -231,7 +233,7 @@ function cpu_flags() {
 
     COMMON_FLAGS="${MARCH} -O2 -pipe"
 
-    # 
+    
 
     return 0
 }
@@ -793,7 +795,7 @@ function chroot() {
         exit 1
     fi
 
-    # 
+    # # 
 
     rm -rf /var/tmp/portage/* &> /dev/null
     rm -rf /var/cache/distfiles/* &> /dev/null
@@ -806,4 +808,4 @@ if ! chroot; then
     exit 1
 fi
 
-return 0
+exit 0
